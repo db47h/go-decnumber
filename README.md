@@ -29,7 +29,7 @@ A concrete example, the function Exp() is defined like this:
 
 It will set *res* to *e* raised to the power of *rhs*. The *rhs* operand can be in any precision (i.e. context independant). However, *\*res*, the decNumber structure that will hold the result, has to have enough storage space to hold the precision specified in the decContext *set*.
 
-In a very linear functionnal programmin model, this is not a serious issue. However, with goroutines flying all over the place, this can get messy. This lead to a few design choices in the go implementation:
+In a top-down functionnal programming model, this is not a serious issue. However, with goroutines flying all over the place, this can get messy. This lead to a few design choices in the go implementation:
 
 - The configuration of a Context is immutable after creation (i.e. cannot change the number of digits, minimum and maximum exponents). Only rounding and status are alterable. If one needs to change precision on the fly, discard the existing context and create a new one with the required precision. Existing Numbers are still usable and valid Numbers.
 - Contexts hold a free list of Numbers and Numbers are created by a Context method. This gives the following idiomatic code for temp Number creation:
