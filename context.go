@@ -16,8 +16,6 @@ package decnumber
 */
 import "C"
 
-import "unsafe"
-
 // FreeListSize holds the default size of the free list of Number pointers for contexts. This
 // is a tunable parameter. Set it to the desired value before creating a Context.
 var FreeListSize uint32 = 128
@@ -61,9 +59,9 @@ const (
 	Information Status = C.DEC_Information // flags which are normally for information only (finite results)
 )
 
-type contextError Status
+type ContextError Status
 
-func (e *contextError) Error() string {
+func (e *ContextError) Error() string {
 	// being lazy - create a dummy context
 	ctx := C.decContext{}
 	ctx.status = C.uint32_t(*e)
@@ -294,44 +292,14 @@ func (c *Context) StatusToString() string {
 	return C.GoString(C.decContextStatusToString(&c.ctx))
 }
 
-// NewNumber returns a new Number suitable for use in the given context. i.e. with enough storage space
-// to hold the context's required number of digits. If memory cannot be allocated for the new number,
-// the function will panic. Numbers are managed in a free list. Once a program is done with a number, it
-// should release it by calling Context.FreeNumber()
-func (c *Context) NewNumber() *Number {
-	return c.fn.Get()
-}
-
-func (c *Context) getError() error {
+// Func GetError() checks the Context status for any error condition
+// and returns, as an error, a *ContextError if any, nil otherwise.
+// Convert the return value with *(*ContextError)(err) to match it
+// against any of the Status values.
+func (c *Context) GetError() error {
 	if e := c.Status() & Errors; e != 0 {
-		e := contextError(e)
+		e := ContextError(e)
 		return &e
 	}
 	return nil
-}
-
-// NumberFromString converts a string to a new Number. It implements the to-number conversion from the arithmetic
-// specification.
-// The conversion is exact provided that the numeric string has no more significant digits than are
-// specified in the Context and the adjusted exponent is in the range specified by the Context's EMin
-// and EMax. If there are more digits in the string than specified in the Context, or the exponent is
-// out of range, the value will be rounded as necessary using the Context rounding mode. The
-// Context therefore determines the maximum precision for unrounded numbers.
-func (c *Context) NumberFromString(s string) (*Number, error) {
-	str := C.CString(s)
-	defer C.free(unsafe.Pointer(str))
-	n := c.NewNumber()
-	C.decNumberFromString(n.n, str, &c.ctx)
-	return n, c.getError()
-}
-
-// FreeNumber declares a Number as free for reuse and puts it back on the free list.
-//
-// WARNING: This function MUST be called on the same context that created the Number. Failing to do
-// so will result in unexpected crashes. The best way to prevent any mistake is to systematically place
-// deferred call to this function right after creating a number.
-func (c *Context) FreeNumber(n *Number) {
-	// zero it before pushing it back
-	n.Zero()
-	c.fn.Put(n)
 }

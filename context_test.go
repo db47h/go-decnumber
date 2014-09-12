@@ -58,6 +58,10 @@ func TestStatusToString(t *testing.T) {
 	if s := ctx.StatusToString(); s != "Division by zero" {
 		t.Fatalf("Wrong status to string conversion. Expected \"Division by zero\", got \"%s\"", s)
 	}
+	err := ctx.GetError()
+	if err == nil || err.Error() != "Division by zero" {
+		t.Fatalf("Wrong status to string conversion. Expected \"Division by zero\", got \"%s\"", err.Error())
+	}
 }
 
 func TestFreeNumber(t *testing.T) {
