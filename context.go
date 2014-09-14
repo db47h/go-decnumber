@@ -32,69 +32,6 @@ const (
 	RoundMax                      // enum must be less than this
 )
 
-// Status represents the status flags (exceptional conditions), and their names.
-// The top byte is reserved for internal use
-type Status uint32
-
-const (
-	ZeroStatus          Status = 0
-	ConversionSyntax    Status = C.DEC_Conversion_syntax
-	DivisionByZero      Status = C.DEC_Division_by_zero
-	DivisionImpossible  Status = C.DEC_Division_impossible
-	DivisionUndefined   Status = C.DEC_Division_undefined
-	InsufficientStorage Status = C.DEC_Insufficient_storage // when malloc fails
-	Inexact             Status = C.DEC_Inexact
-	InvalidContext      Status = C.DEC_Invalid_context
-	InvalidOperation    Status = C.DEC_Invalid_operation
-	Overflow            Status = C.DEC_Overflow
-	Clamped             Status = C.DEC_Clamped
-	Rounded             Status = C.DEC_Rounded
-	Subnormal           Status = C.DEC_Subnormal
-	Underflow           Status = C.DEC_Underflow
-
-	Errors      Status = C.DEC_Errors      // flags which are normally errors (result is qNaN, infinite, or 0)
-	NaNs        Status = C.DEC_NaNs        // flags which cause a result to become qNaN
-	Information Status = C.DEC_Information // flags which are normally for information only (finite results)
-)
-
-var statusString = map[Status]string{
-	ZeroStatus:          "No status",
-	ConversionSyntax:    "Conversion syntax",
-	DivisionByZero:      "Division by zero",
-	DivisionImpossible:  "Division impossible",
-	DivisionUndefined:   "Division undefined",
-	InsufficientStorage: "Insufficient storage",
-	Inexact:             "Inexact",
-	InvalidContext:      "Invalid context",
-	InvalidOperation:    "Invalid operation",
-	Overflow:            "Overflow",
-	Clamped:             "Clamped",
-	Rounded:             "Rounded",
-	Subnormal:           "Subnormal",
-	Underflow:           "Underflow",
-}
-
-// String returns a human-readable description of a status bit as a string..
-// The bits set in the status field must comprise only bits defined.
-// If no bits are set in the status field, the string “No status” is returned. If more than one
-// bit is set, the string “Multiple status” is returned.
-func (s Status) String() string {
-	if str, ok := statusString[s]; ok {
-		return str
-	}
-	return "Multiple status"
-}
-
-// ContextError represents an error condition for a Context. One can check if the last operation
-// in a Context generated an error either with Context.ErrorStatus() (returns a ContextError cast as
-// an error) or Context.TestStatus(Context.Errors) (returns true if an error occured).
-type ContextError Status
-
-// Error returns a string representation of the error status
-func (e ContextError) Error() string {
-	return Status(e).String()
-}
-
 // ContextKind to use when creating a new Context with NewContext()
 type ContextKind int32
 
@@ -150,18 +87,6 @@ func (l *freeNumberList) Put(n *Number) {
 //
 // Most accessor and status manipulation functions (one liners) have be rewriten in pure Go in
 // order to allow inlining and improve performance.
-//
-// Unimplemented functions:
-//
-//	extern decContext  * decContextRestoreStatus(decContext *, uint32_t, uint32_t);
-//	extern uint32_t      decContextSaveStatus(decContext *, uint32_t);
-//	extern decContext  * decContextSetStatusFromString(decContext *, const char *);
-//	extern decContext  * decContextSetStatusFromStringQuiet(decContext *, const char *);
-//	extern uint32_t      decContextTestSavedStatus(uint32_t, uint32_t);
-//
-// TODO: test implementing Status() as returning *Status and make all Status releate functions members of Status
-// This "could" improve status testingif we can cast *C.uint32_t to *uint32
-//
 type Context struct {
 	ctx C.decContext
 	fn  *freeNumberList
@@ -278,6 +203,21 @@ func (c *Context) Digits() int32 {
 	return int32(c.ctx.digits)
 }
 
+// EMin returns the Context's EMin setting
+func (c *Context) EMin() int32 {
+	return int32(c.ctx.emin)
+}
+
+// EMax returns the Context's EMax setting
+func (c *Context) EMax() int32 {
+	return int32(c.ctx.emax)
+}
+
+// Clamp returns the Context's clamping setting
+func (c *Context) Clamp() int8 {
+	return int8(c.ctx.clamp)
+}
+
 // Rounding gets the rounding mode
 func (c *Context) Rounding() Rounding {
 	// return Rounding(C.decContextGetRounding(&c.ctx))
@@ -291,53 +231,16 @@ func (c *Context) SetRounding(newRounding Rounding) *Context {
 	return c
 }
 
-// Status returns the status field of a Context
-func (c *Context) Status() Status {
+// Status returns the status of a Context
+func (c *Context) Status() *Status {
 	// return Status(C.decContextGetStatus(&c.ctx))
-	return Status(c.ctx.status)
-}
-
-// SetStatus sets one or more status bits in the status field of a decContext. Since traps are
-// not supported in the Go implementation, it actually calls decContextSetStatusQuiet
-//
-// Normally, only library modules use this function. Applications may clear status bits with
-// ClearStatus() or ZeroStatus() but should not set them (except, perhaps, for testing).
-func (c *Context) SetStatus(newStatus Status) *Context {
-	// C.decContextSetStatus(&c.ctx, C.uint32_t(newStatus))
-	c.ctx.status |= C.uint32_t(newStatus)
-	return c
-}
-
-// ClearStatus clears (sets to zero) one or more status bits in the status field of a Context.
-//
-// Any 1 (set) bit in the status argument will cause the corresponding bit to be cleared in the
-// context status field.
-func (c *Context) ClearStatus(mask Status) *Context {
-	// C.decContextClearStatus(&c.ctx, C.uint32_t(status))
-	c.ctx.status &^= C.uint32_t(mask)
-	return c
-}
-
-// ZeroStatus is used to clear (set to zero) all the status bits in the status field of a Context.
-func (c *Context) ZeroStatus() *Context {
-	//	C.decContextZeroStatus(&c.ctx)
-	c.ctx.status = 0
-	return c
-}
-
-// TestStatus tests bits in context status and returns true if any of the tested bits are 1.
-func (c *Context) TestStatus(mask Status) bool {
-	// return C.decContextTestStatus(&c.ctx, C.uint32_t(mask))
-	return Status(c.ctx.status)&mask != 0
+	return (*Status)(&c.ctx.status)
 }
 
 // Func ErrorStatus() checks the Context status for any error condition
 // and returns, as an error, a ContextError if any, nil otherwise.
 // Convert the return value with err.(decnumber.ContextError) to compare it
-// against any of the Status values.
+// against any of the Status values. This is a shorthand for Context.Status().ToError()
 func (c *Context) ErrorStatus() error {
-	if e := Status(c.ctx.status) & Errors; e != 0 {
-		return ContextError(e)
-	}
-	return nil
+	return c.Status().ToError()
 }

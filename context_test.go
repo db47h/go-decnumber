@@ -14,6 +14,15 @@ func TestNewContext(t *testing.T) {
 	if d := ctx.Digits(); d != 34 {
 		t.Fatalf("Context init failed. Wrong number of digits. Got %d, expected 34", d)
 	}
+	if e := ctx.EMax(); e != 6144 {
+		t.Fatalf("Context init failed. Wrong EMax. Got %d, expected 6144", e)
+	}
+	if e := ctx.EMin(); e != -6143 {
+		t.Fatalf("Context init failed. Wrong EMin. Got %d, expected -6143", e)
+	}
+	if c := ctx.Clamp(); c != 1 {
+		t.Fatalf("Context init failed. Wrong Clamp. Got %d, expected 1", c)
+	}
 	er := dec.RoundHalfEven
 	if r := ctx.Rounding(); r != er {
 		t.Fatalf("Context init failed. Wrong rounding. Got %d, expected %d", r, er)
@@ -33,45 +42,47 @@ func TestContext_Rounding(t *testing.T) {
 func TestContext_Status(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
 	// Status()
-	if s := ctx.Status(); s != 0 {
+	// NOTE: clients should only use the Status methods, not *s
+	s := ctx.Status()
+	if *s != 0 {
 		t.Fatalf("Wrong status. Got %x, expected 0", s)
 	}
 	// SetStatus() from 0
 	es := dec.InvalidOperation
-	ctx.SetStatus(es)
-	if s := ctx.Status(); s != es {
+	s.Set(es)
+	if *s != es {
 		t.Fatalf("Wrong status. Got %x, expected %x", s, es)
 	}
 	// TestStatus and dec.Errors filter
-	if !ctx.TestStatus(dec.Errors) {
+	if !s.Test(dec.Errors) {
 		t.Fatal("TestStats returned false")
 	}
 	// check that SetStatus "adds" the requested status
 	es |= dec.Overflow
-	ctx.SetStatus(dec.Overflow)
-	if s := ctx.Status(); s != es {
+	s.Set(dec.Overflow)
+	if *s != es {
 		t.Fatalf("Wrong status. Got %x, expected %x", s, es)
 	}
 	// ClearStatus() only clears the requested status
 	es = dec.Overflow
-	ctx.ClearStatus(dec.InvalidOperation)
-	if s := ctx.Status(); s != es {
+	s.Clear(dec.InvalidOperation)
+	if *s != es {
 		t.Fatalf("Wrong status. Got %x, expected %x", s, es)
 	}
 	// ZeroStatus()
-	ctx.ZeroStatus()
-	if s := ctx.Status(); s != 0 {
+	s.Zero()
+	if *s != 0 {
 		t.Fatalf("Non-zero status (%x).", s)
 	}
 }
 
 func TestStatus_String(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
-	ctx.SetStatus(dec.DivisionByZero)
+	ctx.Status().Set(dec.DivisionByZero)
 	if s := ctx.Status().String(); s != "Division by zero" {
 		t.Fatalf("Wrong status to string conversion. Expected \"Division by zero\", got \"%s\"", s)
 	}
-	ctx.SetStatus(dec.Overflow)
+	ctx.Status().Set(dec.Overflow)
 	if s := ctx.Status().String(); s != "Multiple status" {
 		t.Fatalf("Wrong status to string conversion. Expected \"Multiple status\", got \"%s\"", s)
 	}
@@ -79,9 +90,41 @@ func TestStatus_String(t *testing.T) {
 
 func TestContext_ErrorStatus(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
-	ctx.SetStatus(dec.DivisionByZero)
+	ctx.Status().Set(dec.DivisionByZero)
 	err := ctx.ErrorStatus()
 	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
 		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
+	}
+}
+
+func TestStatus_ToError(t *testing.T) {
+	ctx := dec.NewContext(dec.InitDecimal128)
+	err := ctx.Status().Set(dec.DivisionByZero).ToError()
+	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
+		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
+	}
+}
+
+func TestStatus_FromString(t *testing.T) {
+	ctx := dec.NewContext(dec.InitDecimal64)
+	s := ctx.Status()
+	if s.Test(dec.Errors) {
+		t.Fatal("Invalid context") // status should be error free just after creation
+	}
+	_, err := s.SetFromString("Division by zero")
+	if err != nil || *s != dec.DivisionByZero {
+		t.Fatalf("SetFromString failed. Got %x (%v)", *s, err)
+	}
+	_, err = s.SetFromString("Invalid operation")
+	if err != nil || *s != dec.DivisionByZero|dec.InvalidOperation {
+		t.Fatalf("SetFromString failed. Got %x (%v)", *s, err)
+	}
+	_, err = s.SetFromString("Multiple status")
+	if err == nil || err.Error() != "Conversion syntax" {
+		t.Fatal("SetFromString should have failed.")
+	}
+	_, err = s.SetFromString("foobar")
+	if err == nil || err.Error() != "Conversion syntax" {
+		t.Fatal("SetFromString should have failed.")
 	}
 }

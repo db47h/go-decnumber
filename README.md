@@ -118,7 +118,7 @@ In the early days of the package, running tests using the Go->C wrappers (for on
 
 # TODO
 
-- Context: create accessors functions for clamping, emin and emax (for easier context duplication)
+- Implement basic math functions
 
 # Licensing
 

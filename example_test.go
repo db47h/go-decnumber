@@ -36,9 +36,7 @@ func ExampleContext_NewNumberFromString() {
 	fmt.Printf("%s\n", n.String())
 
 	// infinite number
-	// Since NumberFromString may change the Context status, we chain call
-	// NumberFromString() with ZeroStatus()
-	n, err = ctx.ZeroStatus().NewNumberFromString("-INF")
+	n, err = ctx.NewNumberFromString("-INF")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -46,7 +44,7 @@ func ExampleContext_NewNumberFromString() {
 	fmt.Printf("%s\n", n.String())
 
 	// Scientific notation
-	n, err = ctx.ZeroStatus().NewNumberFromString("1.275654e16")
+	n, err = ctx.NewNumberFromString("1.275654e16")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -55,7 +53,7 @@ func ExampleContext_NewNumberFromString() {
 
 	// error. Will cause an overflow and set the number to +Infinity
 	// This is still a "valid" number for some applications
-	n, err = ctx.ZeroStatus().NewNumberFromString("1.275654e321455")
+	n, err = ctx.NewNumberFromString("1.275654e321455")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -64,7 +62,7 @@ func ExampleContext_NewNumberFromString() {
 
 	// Here, we will get a conversion syntax error
 	// and the number will be set to NaN (not a number)
-	n, err = ctx.ZeroStatus().NewNumberFromString("12garbage524")
+	n, err = ctx.NewNumberFromString("12garbage524")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())

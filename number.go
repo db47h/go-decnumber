@@ -99,12 +99,19 @@ func (c *Context) NewNumber() *Number {
 // The length of the coefficient and the size of the exponent are checked by this routine, so the
 // correct error (Underflow or Overflow) can be reported or rounding applied, as necessary. If bad
 // syntax is detected, the result will be a quiet NaN.
-func (c *Context) NewNumberFromString(s string) (*Number, error) {
+//
+// An non-nil error is returned only if an error occured during this operation, regardless of
+// the previous Context status. i.e. there is no need to clear the status beforehand.
+func (c *Context) NewNumberFromString(s string) (n *Number, err error) {
 	str := C.CString(s)
 	defer C.free(unsafe.Pointer(str))
-	n := c.NewNumber()
+	oldStatus := c.Status().Save(Errors) // keep a backup of previous errors on this context
+	c.Status().Clear(Errors)             // and clear them
+	n = c.NewNumber()
 	C.decNumberFromString(n.n, str, &c.ctx)
-	return n, c.ErrorStatus()
+	err = c.Status().ToError()
+	c.Status().Set(*oldStatus) // Merge back the old status
+	return
 }
 
 // FreeNumber declares a Number as free for reuse and puts it back on the free list.
@@ -114,6 +121,5 @@ func (c *Context) NewNumberFromString(s string) (*Number, error) {
 // a deferred call to this function right after creating a number.
 func (c *Context) FreeNumber(n *Number) {
 	// zero it before pushing it back
-	n.Zero()
-	c.fn.Put(n)
+	c.fn.Put(n.Zero())
 }
