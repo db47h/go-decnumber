@@ -91,8 +91,8 @@ func (s Status) String() string {
 type ContextError Status
 
 // Error returns a string representation of the error status
-func (e *ContextError) Error() string {
-	return Status(*e).String()
+func (e ContextError) Error() string {
+	return Status(e).String()
 }
 
 // ContextKind to use when creating a new Context with NewContext()
@@ -332,13 +332,12 @@ func (c *Context) TestStatus(mask Status) bool {
 }
 
 // Func ErrorStatus() checks the Context status for any error condition
-// and returns, as an error, a *ContextError if any, nil otherwise.
-// Convert the return value with *err.(*decnumber.ContextError) to compare it
+// and returns, as an error, a ContextError if any, nil otherwise.
+// Convert the return value with err.(decnumber.ContextError) to compare it
 // against any of the Status values.
 func (c *Context) ErrorStatus() error {
 	if e := Status(c.ctx.status) & Errors; e != 0 {
-		e := ContextError(e)
-		return &e
+		return ContextError(e)
 	}
 	return nil
 }

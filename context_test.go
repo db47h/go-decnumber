@@ -81,7 +81,7 @@ func TestContext_ErrorStatus(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
 	ctx.SetStatus(dec.DivisionByZero)
 	err := ctx.ErrorStatus()
-	if _, ok := err.(*dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
+	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
 		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
 	}
 }
