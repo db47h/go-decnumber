@@ -5,14 +5,14 @@
 package decnumber_test
 
 import (
-	"bitbucket.org/wildservices/go-decnumber"
+	"."
 	"fmt"
 )
 
 // NewNumber() example
-func ExampleNewNumber() {
+func ExampleContext_NewNumber() {
 	// create a context with 99 digits precision
-	ctx := decnumber.NewCustomContext(99, decnumber.MaxEMax, decnumber.MinEMin, decnumber.RoundHalfEven, 0)
+	ctx := decnumber.NewCustomContext(99, decnumber.MaxMath, 1-decnumber.MaxMath, decnumber.RoundHalfEven, 0)
 
 	// create a number
 	n := ctx.NewNumber()
@@ -24,10 +24,10 @@ func ExampleNewNumber() {
 	defer ctx.FreeNumber(n)
 }
 
-// Various examples of Number.NumberFromString()
-func ExampleContext_NumberFromString() {
+// Accpeted formats and error handling demo.
+func ExampleContext_NewNumberFromString() {
 	ctx := decnumber.NewContext(decnumber.InitDecimal64)
-	n, err := ctx.NumberFromString("378.2654651646516165416165315131232")
+	n, err := ctx.NewNumberFromString("378.2654651646516165416165315131232")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error)
@@ -38,7 +38,7 @@ func ExampleContext_NumberFromString() {
 	// infinite number
 	// Since NumberFromString may change the Context status, we chain call
 	// NumberFromString() with ZeroStatus()
-	n, err = ctx.ZeroStatus().NumberFromString("-INF")
+	n, err = ctx.ZeroStatus().NewNumberFromString("-INF")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -46,7 +46,7 @@ func ExampleContext_NumberFromString() {
 	fmt.Printf("%s\n", n.String())
 
 	// Scientific notation
-	n, err = ctx.ZeroStatus().NumberFromString("1.275654e16")
+	n, err = ctx.ZeroStatus().NewNumberFromString("1.275654e16")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -55,7 +55,7 @@ func ExampleContext_NumberFromString() {
 
 	// error. Will cause an overflow and set the number to +Infinity
 	// This is still a "valid" number for some applications
-	n, err = ctx.ZeroStatus().NumberFromString("1.275654e321455")
+	n, err = ctx.ZeroStatus().NewNumberFromString("1.275654e321455")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -64,7 +64,7 @@ func ExampleContext_NumberFromString() {
 
 	// Here, we will get a conversion syntax error
 	// and the number will be set to NaN (not a number)
-	n, err = ctx.ZeroStatus().NumberFromString("12garbage524")
+	n, err = ctx.ZeroStatus().NewNumberFromString("12garbage524")
 	defer ctx.FreeNumber(n)
 	if err != nil {
 		fmt.Println(err.Error())

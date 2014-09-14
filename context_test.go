@@ -5,9 +5,8 @@
 package decnumber_test
 
 import (
-	dec "bitbucket.org/wildservices/go-decnumber"
+	dec "."
 	"testing"
-	"unsafe"
 )
 
 func TestNewContext(t *testing.T) {
@@ -21,7 +20,7 @@ func TestNewContext(t *testing.T) {
 	}
 }
 
-func TestRounding(t *testing.T) {
+func TestContext_Rounding(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
 	er := dec.RoundUp
 	ctx.SetRounding(er)
@@ -30,51 +29,59 @@ func TestRounding(t *testing.T) {
 	}
 }
 
-func TestStatus(t *testing.T) {
+// Here, we test all status methods
+func TestContext_Status(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
-	if s := ctx.Status(); s&dec.Errors != 0 || s != 0 {
+	// Status()
+	if s := ctx.Status(); s != 0 {
 		t.Fatalf("Wrong status. Got %x, expected 0", s)
 	}
+	// SetStatus() from 0
 	es := dec.InvalidOperation
 	ctx.SetStatus(es)
-	if s := ctx.Status(); s&dec.Errors == 0 || s != es {
+	if s := ctx.Status(); s != es {
 		t.Fatalf("Wrong status. Got %x, expected %x", s, es)
 	}
-	es = dec.Inexact
-	ctx.SetStatus(es)
-	ctx.ClearStatus(dec.Errors)
-	if s := ctx.Status(); s&dec.Errors != 0 || s != es {
+	// TestStatus and dec.Errors filter
+	if !ctx.TestStatus(dec.Errors) {
+		t.Fatal("TestStats returned false")
+	}
+	// check that SetStatus "adds" the requested status
+	es |= dec.Overflow
+	ctx.SetStatus(dec.Overflow)
+	if s := ctx.Status(); s != es {
 		t.Fatalf("Wrong status. Got %x, expected %x", s, es)
 	}
+	// ClearStatus() only clears the requested status
+	es = dec.Overflow
+	ctx.ClearStatus(dec.InvalidOperation)
+	if s := ctx.Status(); s != es {
+		t.Fatalf("Wrong status. Got %x, expected %x", s, es)
+	}
+	// ZeroStatus()
 	ctx.ZeroStatus()
 	if s := ctx.Status(); s != 0 {
 		t.Fatalf("Non-zero status (%x).", s)
 	}
 }
 
-func TestStatusToString(t *testing.T) {
+func TestStatus_String(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
 	ctx.SetStatus(dec.DivisionByZero)
-	if s := ctx.StatusToString(); s != "Division by zero" {
+	if s := ctx.Status().String(); s != "Division by zero" {
 		t.Fatalf("Wrong status to string conversion. Expected \"Division by zero\", got \"%s\"", s)
 	}
-	err := ctx.GetError()
-	if err == nil || err.Error() != "Division by zero" {
-		t.Fatalf("Wrong status to string conversion. Expected \"Division by zero\", got \"%s\"", err.Error())
+	ctx.SetStatus(dec.Overflow)
+	if s := ctx.Status().String(); s != "Multiple status" {
+		t.Fatalf("Wrong status to string conversion. Expected \"Multiple status\", got \"%s\"", s)
 	}
 }
 
-func TestFreeNumber(t *testing.T) {
+func TestContext_ErrorStatus(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
-	n := ctx.NewNumber()
-	p := ctx.NewNumber()
-	ctx.FreeNumber(n)
-	// Just make sure we get the same pointer
-	if unsafe.Pointer(p) == unsafe.Pointer(n) {
-		t.Fatalf("subsequent calls to NemNumber() yield same object")
-	}
-	q := ctx.NewNumber()
-	if unsafe.Pointer(q) != unsafe.Pointer(n) {
-		t.Fatalf("pointer mismatch")
+	ctx.SetStatus(dec.DivisionByZero)
+	err := ctx.ErrorStatus()
+	if _, ok := err.(*dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
+		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
 	}
 }

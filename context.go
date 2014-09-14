@@ -8,7 +8,6 @@ package decnumber
 #cgo CFLAGS: -Ilibdecnumber
 
 #include "go-decnumber.h"
-#include "decNumber.h"
 #include "decContext.h"
 #include <stdlib.h>
 
@@ -40,6 +39,7 @@ const (
 type Status uint32
 
 const (
+	ZeroStatus          Status = 0
 	ConversionSyntax    Status = C.DEC_Conversion_syntax
 	DivisionByZero      Status = C.DEC_Division_by_zero
 	DivisionImpossible  Status = C.DEC_Division_impossible
@@ -59,14 +59,42 @@ const (
 	Information Status = C.DEC_Information // flags which are normally for information only (finite results)
 )
 
+var statusString = map[Status]string{
+	ZeroStatus:          "No status",
+	ConversionSyntax:    "Conversion syntax",
+	DivisionByZero:      "Division by zero",
+	DivisionImpossible:  "Division impossible",
+	DivisionUndefined:   "Division undefined",
+	InsufficientStorage: "Insufficient storage",
+	Inexact:             "Inexact",
+	InvalidContext:      "Invalid context",
+	InvalidOperation:    "Invalid operation",
+	Overflow:            "Overflow",
+	Clamped:             "Clamped",
+	Rounded:             "Rounded",
+	Subnormal:           "Subnormal",
+	Underflow:           "Underflow",
+}
+
+// String returns a human-readable description of a status bit as a string..
+// The bits set in the status field must comprise only bits defined.
+// If no bits are set in the status field, the string “No status” is returned. If more than one
+// bit is set, the string “Multiple status” is returned.
+func (s Status) String() string {
+	if str, ok := statusString[s]; ok {
+		return str
+	}
+	return "Multiple status"
+}
+
+// ContextError represents an error condition for a Context. One can check if the last operation
+// in a Context generated an error either with Context.ErrorStatus() (returns a ContextError cast as
+// an error) or Context.TestStatus(Context.Errors) (returns true if an error occured).
 type ContextError Status
 
+// Error returns a string representation of the error status
 func (e *ContextError) Error() string {
-	// being lazy - create a dummy context
-	ctx := C.decContext{}
-	ctx.status = C.uint32_t(*e)
-	//the returned C string is a pointer to a constant string, no free()'ing it necessary
-	return C.GoString(C.decContextStatusToString(&ctx))
+	return Status(*e).String()
 }
 
 // ContextKind to use when creating a new Context with NewContext()
@@ -90,14 +118,16 @@ const (
 	MinEMax   = 0
 	MaxEMin   = 0
 	MinEMin   = -999999999
+	MaxMath   = 999999
 )
 
 // free list of numbers
 type freeNumberList struct {
-	size int32 // number of digits
+	size int32 // number of digits. Needed to create new numbers of the proper size
 	ch   chan *Number
 }
 
+// Get a *Number from the list or create a new one
 func (l *freeNumberList) Get() *Number {
 	select {
 	case n := <-l.ch:
@@ -107,6 +137,7 @@ func (l *freeNumberList) Get() *Number {
 	return newNumber(l.size)
 }
 
+// Put back a *Number in the free list
 func (l *freeNumberList) Put(n *Number) {
 	select {
 	case l.ch <- n:
@@ -117,22 +148,23 @@ func (l *freeNumberList) Put(n *Number) {
 // A Context wraps a decNumber context, the data structure used for providing the context
 // for operations and for managing exceptional conditions.
 //
-// Contexts should be created using the NewContext() function. The
+// Contexts must be created using the NewContext() or NewCustomContext() functions.
+//
+// Most accessor and status manipulation functions (one liners) have be rewriten in pure Go in
+// order to allow inlining and improve performance.
+//
+// Unimplemented functions:
+//
+//	extern decContext  * decContextRestoreStatus(decContext *, uint32_t, uint32_t);
+//	extern uint32_t      decContextSaveStatus(decContext *, uint32_t);
+//	extern decContext  * decContextSetStatusFromString(decContext *, const char *);
+//	extern decContext  * decContextSetStatusFromStringQuiet(decContext *, const char *);
+//	extern uint32_t      decContextTestSavedStatus(uint32_t, uint32_t);
+//
 type Context struct {
 	ctx C.decContext
 	fn  *freeNumberList
 }
-
-/*
-  // missing decContext routines
-  extern decContext  * decContextRestoreStatus(decContext *, uint32_t, uint32_t);
-  extern uint32_t      decContextSaveStatus(decContext *, uint32_t);
-  extern decContext  * decContextSetStatus(decContext *, uint32_t);
-  extern decContext  * decContextSetStatusFromString(decContext *, const char *);
-  extern decContext  * decContextSetStatusFromStringQuiet(decContext *, const char *);
-  extern uint32_t      decContextTestSavedStatus(uint32_t, uint32_t);
-  extern uint32_t      decContextTestStatus(decContext *, uint32_t);
-*/
 
 // NewContext creates a new context of the requested kind.
 //
@@ -186,14 +218,16 @@ func NewContext(kind ContextKind) (pContext *Context) {
 // NewCustom context returns a new Context setup with the requested parameters.
 //
 // digits is used to set the precision to be used for an operation. The result of an
-// operation will be rounded to this length if necessary. digits should be in [MinDigits, MaxDigits]
+// operation will be rounded to this length if necessary. digits should be in [MinDigits, MaxDigits].
+// The maximum supported value for digits in many arithmetic operations is MaxMath.
 //
 // emax is used to set the magnitude of the largest adjusted exponent that is
 // permitted. The adjusted exponent is calculated as though the number were expressed in
 // scientific notation (that is, except for 0, expressed with one non-zero digit before the
 // decimal point).
 // If the adjusted exponent for a result or conversion would be larger than emax then an
-// overflow results. emax should be in [MinEMax, MaxEMax]
+// overflow results. emax should be in [MinEMax, MaxEMax]. The maximum supported value for iemax
+// in many arithmetic operations is MaxMath.
 //
 // emin is used to set the smallest adjusted exponent that is permitted for normal
 // numbers. The adjusted exponent is calculated as though the number were expressed in
@@ -202,7 +236,8 @@ func NewContext(kind ContextKind) (pContext *Context) {
 // If the adjusted exponent for a result or conversion would be smaller than emin then the
 // result is subnormal. If the result is also inexact, an underflow results. The exponent of
 // the smallest possible number (closest to zero) will be emin-digits+1. emin is usually set to
-// -emax or to -(emax-1). emin should be in [MinEMin, MaxEMin]
+// -emax or to -(emax-1). emin should be in [MinEMin, MaxEMin]. The minimum supported value for
+// emin in many arithmetic operations is -MaxMath.
 //
 // round is used to select the rounding algorithm to be used if rounding is
 // necessary during an operation. It must be one of the values in the Rounding
@@ -244,18 +279,21 @@ func (c *Context) Digits() int32 {
 
 // Rounding gets the rounding mode
 func (c *Context) Rounding() Rounding {
-	return Rounding(C.decContextGetRounding(&c.ctx))
+	// return Rounding(C.decContextGetRounding(&c.ctx))
+	return Rounding(c.ctx.round)
 }
 
 // SetRounding sets the rounding mode
 func (c *Context) SetRounding(newRounding Rounding) *Context {
-	C.decContextSetRounding(&c.ctx, uint32(newRounding))
+	// C.decContextSetRounding(&c.ctx, uint32(newRounding))
+	c.ctx.round = uint32(newRounding) // C enums have a Go type, not C
 	return c
 }
 
 // Status returns the status field of a Context
 func (c *Context) Status() Status {
-	return Status(C.decContextGetStatus(&c.ctx))
+	// return Status(C.decContextGetStatus(&c.ctx))
+	return Status(c.ctx.status)
 }
 
 // SetStatus sets one or more status bits in the status field of a decContext. Since traps are
@@ -264,7 +302,8 @@ func (c *Context) Status() Status {
 // Normally, only library modules use this function. Applications may clear status bits with
 // ClearStatus() or ZeroStatus() but should not set them (except, perhaps, for testing).
 func (c *Context) SetStatus(newStatus Status) *Context {
-	C.decContextSetStatus(&c.ctx, C.uint32_t(newStatus))
+	// C.decContextSetStatus(&c.ctx, C.uint32_t(newStatus))
+	c.ctx.status |= C.uint32_t(newStatus)
 	return c
 }
 
@@ -272,32 +311,31 @@ func (c *Context) SetStatus(newStatus Status) *Context {
 //
 // Any 1 (set) bit in the status argument will cause the corresponding bit to be cleared in the
 // context status field.
-func (c *Context) ClearStatus(status Status) *Context {
-	C.decContextClearStatus(&c.ctx, C.uint32_t(status))
+func (c *Context) ClearStatus(mask Status) *Context {
+	// C.decContextClearStatus(&c.ctx, C.uint32_t(status))
+	c.ctx.status &^= C.uint32_t(mask)
 	return c
 }
 
 // ZeroStatus is used to clear (set to zero) all the status bits in the status field of a Context.
 func (c *Context) ZeroStatus() *Context {
-	C.decContextZeroStatus(&c.ctx)
+	//	C.decContextZeroStatus(&c.ctx)
+	c.ctx.status = 0
 	return c
 }
 
-// StatusToString returns a human-readable description of a status bit as a string..
-// The bits set in the status field must comprise only bits defined.
-// If no bits are set in the status field, the string “No status” is returned. If more than one
-// bit is set, the string “Multiple status” is returned.
-func (c *Context) StatusToString() string {
-	//the returned C string is a pointer to a constant string, no free()'ing it necessary
-	return C.GoString(C.decContextStatusToString(&c.ctx))
+// TestStatus tests bits in context status and returns true if any of the tested bits are 1.
+func (c *Context) TestStatus(mask Status) bool {
+	// return C.decContextTestStatus(&c.ctx, C.uint32_t(mask))
+	return Status(c.ctx.status)&mask != 0
 }
 
-// Func GetError() checks the Context status for any error condition
+// Func ErrorStatus() checks the Context status for any error condition
 // and returns, as an error, a *ContextError if any, nil otherwise.
-// Convert the return value with *(*ContextError)(err) to match it
+// Convert the return value with *err.(*decnumber.ContextError) to compare it
 // against any of the Status values.
-func (c *Context) GetError() error {
-	if e := c.Status() & Errors; e != 0 {
+func (c *Context) ErrorStatus() error {
+	if e := Status(c.ctx.status) & Errors; e != 0 {
 		e := ContextError(e)
 		return &e
 	}

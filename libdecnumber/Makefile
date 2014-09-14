@@ -1,14 +1,23 @@
-SRC = obj/decQuad.c obj/decNumber.c obj/decContext.c
-HEADER_FILES = decNumberLocal.h
-STATICLIB = lib/libdecnumber.a
-CFLAGS = -Wall
-CC = gcc
-DIRS = obj lib
+OBJS := obj/decQuad.o obj/decNumber.o obj/decContext.o
+HEADER_FILES := decNumberLocal.h
+STATICLIB := lib/libdecnumber.a
+# default to little endian. Run make DECLITEND=0 on big endian architectures
+DECLITEND ?= 1
+CFLAGS += -Wall -Werror -std=c99 -DDECPRINT=0 -DDECEXTGLAG=1 -DDECLITEND=$(DECLITEND)
+CC ?= gcc
+DIRS := obj lib
+# TODO: dynamically check the arch, crosscompile
+SYSO := ../libdecnumber.syso
 
 all: $(DIRS) $(STATICLIB)
 
-$(STATICLIB): $(SRC:.c=.o)
-	ar rcs $@ $^
+syso: $(SYSO)
+
+$(STATICLIB): $(OBJS)
+	$(AR) rcs $@ $^
+
+$(SYSO): $(OBJS)
+	$(LD) -r $^ -o $@
 
 obj/%.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -21,4 +30,4 @@ $(OBJS) : $(HEADER_FILES)
 clean:
 	-rm -f obj/*.o
 	-rm -f lib/*.a
-
+	-rm $(SYSO)

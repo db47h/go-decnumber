@@ -7,23 +7,29 @@
 package decnumber
 
 /*
-#cgo CFLAGS: -Ilibdecnumber
-
+// #cgo flags are specified in context.go
 #include "go-decnumber.h"
 #include "decNumber.h"
 #include <stdlib.h>
 
 #include "decNumber.c"
 
-size_t decNumberStructSize(int32_t digits) {
-	return sizeof(decNumber)+(D2U(digits-1)*sizeof(Unit));
-}
+// Helpers for go code
+#define sz_Unit sizeof(decNumberUnit)
+// size of a decNumber with 0 digits
+#define sz_decNumber (sizeof(decNumber)-DECNUMUNITS*sizeof(decNumberUnit))
 */
 import "C"
 
 import (
 	"runtime"
 	"unsafe"
+)
+
+const (
+	_DPUN         = C.size_t(C.DECDPUN)
+	_sz_Unit      = C.size_t(C.sz_Unit)
+	_sz_decNumber = C.size_t(C.sz_decNumber)
 )
 
 // A Number reprsents a number optimized for efficient processing of relatively short numbers (tens or
@@ -37,9 +43,10 @@ type Number struct {
 }
 
 func newNumber(digits int32) *Number {
-	// estimate necessary space to allocate structure
 	num := &Number{}
-	num.n = (*C.decNumber)(C.malloc(C.decNumberStructSize(C.int32_t(digits))))
+	// required structure size do hold the requested amount of digits
+	dnSize := _sz_decNumber + (C.size_t(digits)+_DPUN-1)/_DPUN*_sz_Unit
+	num.n = (*C.decNumber)(C.malloc(dnSize))
 	if num.n == nil {
 		panic("Malloc failed")
 	}
@@ -55,7 +62,13 @@ func (n *Number) finalize() {
 
 // Zero sets the value of a Number to zero.
 func (n *Number) Zero() *Number {
-	C.decNumberZero(n.n)
+	// C.decNumberZero(n.n)
+	// Reimplemented in Go for speed
+	dn := n.n
+	dn.bits = 0
+	dn.exponent = 0
+	dn.digits = 1
+	dn.lsu[0] = 0
 	return n
 }
 
@@ -85,19 +98,19 @@ func (c *Context) NewNumber() *Number {
 	return c.fn.Get()
 }
 
-// NumberFromString converts a string to a new Number. It implements the to-number conversion from the arithmetic
+// NewNumberFromString converts a string to a new Number. It implements the to-number conversion from the arithmetic
 // specification.
 // The conversion is exact provided that the numeric string has no more significant digits than are
 // specified in the Context and the adjusted exponent is in the range specified by the Context's EMin
 // and EMax. If there are more digits in the string than specified in the Context, or the exponent is
 // out of range, the value will be rounded as necessary using the Context rounding mode. The
 // Context therefore determines the maximum precision for unrounded numbers.
-func (c *Context) NumberFromString(s string) (*Number, error) {
+func (c *Context) NewNumberFromString(s string) (*Number, error) {
 	str := C.CString(s)
 	defer C.free(unsafe.Pointer(str))
 	n := c.NewNumber()
 	C.decNumberFromString(n.n, str, &c.ctx)
-	return n, c.GetError()
+	return n, c.ErrorStatus()
 }
 
 // FreeNumber declares a Number as free for reuse and puts it back on the free list.
@@ -110,5 +123,3 @@ func (c *Context) FreeNumber(n *Number) {
 	n.Zero()
 	c.fn.Put(n)
 }
-
-// Math functions
