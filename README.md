@@ -103,14 +103,14 @@ And benefit:
 	go test -tags="syso" -i ./...
 	go test -tags="syso "./...
 
-When the `syso` tag is specified in a Go build, the wrapper files (decContext.go and decNumber.go) are ignored and the build uses the precompiled object file libdecnumber_${GOOS}_${GOARCH}.syso.
+When the `syso` tag is specified in a Go build, the wrapper files (decContext.go and decNumber.go) are ignored and the build uses the precompiled object file libdecnumber_${GOOS}_${GOARCH}.syso. The difference with a static library is that we do not have to use a ``#cgo LDFLAGS` directive that would bring in the static library in client projects as well.
 
-The top level Makefile (at the root of the package folder) has shortcuts for the above:
+The top level Makefile (at the root of the package folder) has the following targets:
 
-	make	# builds using the "normal" wrapper mechanism, removing any syso file beforehand
-	make build	# build using the syso file, compiling it if necessary
-	make test	# test using the syso file, compiling it if necessary
-	make clean	# the usual + removes the syso file.
+	make            # builds using the "normal" wrapper mechanism, removing any syso file beforehand
+	make build      # build using the syso file, compiling it if necessary
+	make test       # test using the syso file, compiling it if necessary
+	make clean      # the usual + removes the syso file.
 
 In the early days of the package, running tests using the Go->C wrappers (for only 2 C files) took 3 seconds on my workstation, versus only 1 second when using the syso mechanism. 
 
