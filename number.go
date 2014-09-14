@@ -2,17 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-/* This file is a wrapper around decNumber.c */
-
 package decnumber
 
 /*
-// #cgo flags are specified in context.go
 #include "go-decnumber.h"
 #include "decNumber.h"
 #include <stdlib.h>
-
-#include "decNumber.c"
 
 // Helpers for go code
 #define sz_Unit sizeof(decNumberUnit)

@@ -11,6 +11,8 @@ SYSO := ../libdecnumber.syso
 
 all: $(DIRS) $(STATICLIB)
 
+.PHONY: all syso clean
+
 syso: $(SYSO)
 
 $(STATICLIB): $(OBJS)
@@ -30,4 +32,4 @@ $(OBJS) : $(HEADER_FILES)
 clean:
 	-rm -f obj/*.o
 	-rm -f lib/*.a
-	-rm $(SYSO)
+	-[ ! -e $(SYSO) ] || rm $(SYSO)
