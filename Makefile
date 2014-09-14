@@ -1,31 +1,35 @@
-TAGS := 
-SYSOTAGS := $(TAGS) syso
 LIB := libdecnumber
-SYSO := $(LIB).syso
-TARGET := $(GOPATH)/pkg/linux_amd64/github.com/wildservices/go-decnumber.a
 
-all: build-standalone
+GOARCH ?= $(shell go env | awk -F'["]' '/GOARCH=/{print $$2}')
+GOOS ?= $(shell go env | awk -F'["]' '/GOOS=/{print $$2}')
 
-.PHONY: all build-standalone build test install clean
+GOTAGS += syso
+SYSOBJECT := $(LIB)_$(GOOS)_$(GOARCH).syso
 
-build-standalone:
-	-@[ ! -e "$(SYSO)" ] || rm "$(SYSO)"
-	go build -tags="$(TAGS)" ./...
+all: build-nosyso
 
-$(SYSO): 
+.PHONY: all build-nosyso build test install clean syso
+
+build-nosyso:
+	-@[ ! -e "$(SYSOBJECT)" ] || rm "$(SYSOBJECT)"
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -tags="$(TAGS)" ./...
+
+syso:	$(SYSOBJECT)
+
+$(SYSOBJECT): 
 	$(MAKE) -C "$(LIB)" syso
 
-build: $(SYSO)
-	go build -tags="$(SYSOTAGS)" ./...
+build: $(SYSOBJECT)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go build -tags="$(GOTAGS)" ./...
 
-test: $(SYSO)
-	go test -tags="$(SYSOTAGS)" -i ./...
-	go test -tags="$(SYSOTAGS)" ./...
+# why does test need CGO_ENABLED set to work when cross compiling?
+test: $(SYSOBJECT)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=1 go test -tags="$(GOTAGS)" -i ./...
+	GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=1 go test -tags="$(GOTAGS)" ./...
 
-install: $(SYSO)
-	go install -tags="$(SYSOTAGS)"
+install: $(SYSOBJECT)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) go install -tags="$(GOTAGS)"
 
 clean:
 	$(MAKE) -C "$(LIB)" clean
-	-[ ! -e "$(TARGET)" ] || rm "$(TARGET)"
 

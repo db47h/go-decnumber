@@ -11,9 +11,6 @@ package decnumber
 /*
 // #cgo flags are specified in context.go
 #include "go-decnumber.h"
-#include "decNumber.h"
-#include <stdlib.h>
-
 #include "decNumber.c"
 */
 import "C"

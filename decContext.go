@@ -9,12 +9,8 @@
 package decnumber
 
 /*
-#cgo CFLAGS: -Ilibdecnumber
-
+// #cgo flags are specified in context.go
 #include "go-decnumber.h"
-#include "decContext.h"
-#include <stdlib.h>
-
 #include "decContext.c"
 */
 import "C"

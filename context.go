@@ -5,6 +5,8 @@
 package decnumber
 
 /*
+#cgo CFLAGS: -Ilibdecnumber
+
 #include "go-decnumber.h"
 #include "decContext.h"
 #include <stdlib.h>

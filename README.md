@@ -1,6 +1,8 @@
 # Overview
 
-go-decnumber is a go wrapper package around the [libDecnumber library](http://speleotrove.com/decimal/decnumber.html).
+go-decnumber is a go wrapper package around the [libDecnumber library][lib].
+
+[lib]: http://speleotrove.com/decimal/decnumber.html
 
 # Implementation details
 
@@ -18,11 +20,9 @@ or if only decNumber is needed:
 
 My initial intent was to split the wrapper into modules, in the same way as the C code. However, this lead to unsolvable compilation issues, like missing references in the Number module to the Context module. This is a no-Go (sorry) without shared libraries. However, I did not want to force the end-user of the package to build and install a custom shared library, and considering the design decisions discussed in the next section, I ended up making a monolithic package around decNumber and decContext.
 
-The usual way to link Go code against a static library is to use a `#cgo LDFLAGS: static/patch/to/lib/lib.a` directive. Since this package is meant to be imported into other projects, using LDFLAGS was not possible without some standardized/portable/flexible way to specify the path to the static library (whatever a package puts into LDFLAGS propagates to the project importing it). I also wanted the package to be `go get`able. The trick to make it work is to use Go source files as wrappers around the relevant C files and `#include` them.
+The usual way to link Go code against a static library is to use a `#cgo LDFLAGS: static/patch/to/lib/lib.a` directive. Since this package is meant to be imported into other projects, using LDFLAGS was not possible without some standardized/portable/flexible way to specify the path to the static library (whatever a package puts into LDFLAGS propagates to the project importing it). I also wanted the package to be `go get`able.
 
-This works quite well, except for long build times and a weird behaviour of `go test` if not using a relative import path in test source files.
-
-TODO: document syso
+The trick to make it work is to use Go source files as wrappers around the relevant C files and `#include` them. This works quite well, except for long build times and a weird behaviour of `go test` if not using a relative import path in test source files. The files decContext.go and decNumber.go just do this: include the corresponding C file. See the topic about building/installing for more options.
 
 Most of the short C functions (accessors) have been reimplemented in Go in order to improve performance. Use
 
@@ -68,7 +68,6 @@ As a more concrete usage example, in a calculator application we have:
 
 For all arithmetic computations, temporary numbers, etc., we use the idiomatic deferred call to FreeNumber(). When numbers get pushed off the stack, they are just discarded, without a call to FreeNumber(). When the user requests a change in precision, the global context is replaced by a newly created one with the requested precision. Numbers present on the stack are kept as is since they are still valid Numbers when used as operands in arithmetic functions.
 
-
 ## Threading, goroutines
 
 The decNumber package is thread safe as long as threads do not share decContext or decNumber structures. The same goes for the Go wrapper. Goroutines should have their own context. For Numbers, if you need to share them, share by communicating.
@@ -82,6 +81,40 @@ Right now, go-decnumber only supports decNumber. Adding support for any of the *
 - A free list is less necessary for the float types since their size is static (up to 128 bits), unlike Number which s a variable size (depending on the Context's precision) and require malloc/feee calls. Quads that are not used outside of a function body should be allocated on the stack (to be tested).
 
 Another thing to consider is that for the float types, the Context is used only for error checking and rounding mode. Defining a Context interface with a Number and Quad implementation could be a solution.
+
+# Building / Installing
+
+If you only intend to include this package in your own project, just run
+
+	go get -u github.com/wildservices/go-decnumber
+
+and you're all set.
+
+Another option for package maintainers is to use the [.syso mechanism][syso] which greatly speeds up the build process. The idea is to bundle together all the .o files into a single .syso file. When such a file is present in a package folder, it will automatically be linked with the other object files.
+
+To make the .syso file:
+
+	cd libdecnumber
+	make syso
+	cd ..
+
+And benefit:
+
+	go test -tags="syso" -i ./...
+	go test -tags="syso "./...
+
+When the `syso` tag is specified in a Go build, the wrapper files (decContext.go and decNumber.go) are ignored and the build uses the precompiled object file libdecnumber_${GOOS}_${GOARCH}.syso.
+
+The top level Makefile (at the root of the package folder) has shortcuts for the above:
+
+	make	# builds using the "normal" wrapper mechanism, removing any syso file beforehand
+	make build	# build using the syso file, compiling it if necessary
+	make test	# test using the syso file, compiling it if necessary
+	make clean	# the usual + removes the syso file.
+
+In the early days of the package, running tests using the Go->C wrappers (for only 2 C files) took 3 seconds on my workstation, versus only 1 second when using the syso mechanism. 
+
+[syso]: https://code.google.com/p/go-wiki/wiki/GcToolchainTricks#Use_syso_file_to_embed_arbitrary_self-contained_C_code
 
 # TODO
 
