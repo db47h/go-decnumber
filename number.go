@@ -100,11 +100,10 @@ func (c *Context) NewNumber() *Number {
 
 // NewNumberFromString converts a string to a new Number. It implements the to-number conversion from the arithmetic
 // specification.
-// The conversion is exact provided that the numeric string has no more significant digits than are
-// specified in the Context and the adjusted exponent is in the range specified by the Context's EMin
-// and EMax. If there are more digits in the string than specified in the Context, or the exponent is
-// out of range, the value will be rounded as necessary using the Context rounding mode. The
-// Context therefore determines the maximum precision for unrounded numbers.
+//
+// The length of the coefficient and the size of the exponent are checked by this routine, so the
+// correct error (Underflow or Overflow) can be reported or rounding applied, as necessary. If bad
+// syntax is detected, the result will be a quiet NaN.
 func (c *Context) NewNumberFromString(s string) (*Number, error) {
 	str := C.CString(s)
 	defer C.free(unsafe.Pointer(str))
@@ -117,7 +116,7 @@ func (c *Context) NewNumberFromString(s string) (*Number, error) {
 //
 // WARNING: This function MUST be called on the same context that created the Number. Failing to do
 // so will result in unexpected crashes. The best way to prevent any mistake is to systematically place
-// deferred call to this function right after creating a number.
+// a deferred call to this function right after creating a number.
 func (c *Context) FreeNumber(n *Number) {
 	// zero it before pushing it back
 	n.Zero()

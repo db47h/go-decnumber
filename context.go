@@ -161,6 +161,9 @@ func (l *freeNumberList) Put(n *Number) {
 //	extern decContext  * decContextSetStatusFromStringQuiet(decContext *, const char *);
 //	extern uint32_t      decContextTestSavedStatus(uint32_t, uint32_t);
 //
+// TODO: test implementing Status() as returning *Status and make all Status releate functions members of Status
+// This "could" improve status testingif we can cast *C.uint32_t to *uint32
+//
 type Context struct {
 	ctx C.decContext
 	fn  *freeNumberList
