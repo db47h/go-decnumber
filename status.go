@@ -15,7 +15,6 @@ import "C"
 type Status uint32
 
 const (
-	ZeroStatus          Status = 0
 	ConversionSyntax    Status = C.DEC_Conversion_syntax
 	DivisionByZero      Status = C.DEC_Division_by_zero
 	DivisionImpossible  Status = C.DEC_Division_impossible
@@ -36,7 +35,6 @@ const (
 )
 
 var statusString = map[Status]string{
-	ZeroStatus:          "No status",
 	ConversionSyntax:    "Conversion syntax",
 	DivisionByZero:      "Division by zero",
 	DivisionImpossible:  "Division impossible",
@@ -57,6 +55,9 @@ var statusString = map[Status]string{
 // If no bits are set in the status field, the string “No status” is returned. If more than one
 // bit is set, the string “Multiple status” is returned.
 func (s *Status) String() string {
+	if *s == 0 {
+		return "No status"
+	}
 	if str, ok := statusString[*s]; ok {
 		return str
 	}
