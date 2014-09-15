@@ -10,12 +10,12 @@ LOCALCFLAGS  := -std=c99 -DDECPRINT=0 -DDECEXTGLAG=1 -DDECLITEND=$(DECLITEND)
 
 # shouldn't need to customize anything from this point
 CFLAGS ?= -Wall -Werror
-GOARCH ?= $(shell go env | awk -F'["]' '/GOARCH=/{print $$2}')
-GOOS ?= $(shell go env | awk -F'["]' '/GOOS=/{print $$2}')
+GOARCH ?= $(shell go env GOARCH)
+GOOS ?= $(shell go env GOOS)
 
-CC := $(shell go env | awk -F'["]' '/CC=/{print $$2}')
+CC := $(shell go env CC)
 
-CFLAGS += $(shell go env | awk -F'["]' '/GOGCCFLAGS=/{print $$2}')
+CFLAGS += $(shell go env GOGCCFLAGS)
 CFLAGS += $(LOCALCFLAGS)
 
 OBJDIR  := obj_$(GOOS)_$(GOARCH)

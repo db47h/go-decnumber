@@ -1,7 +1,7 @@
 LIB := libdecnumber
 
-GOARCH ?= $(shell go env | awk -F'["]' '/GOARCH=/{print $$2}')
-GOOS ?= $(shell go env | awk -F'["]' '/GOOS=/{print $$2}')
+GOARCH ?= $(shell go env GOARCH)
+GOOS ?= $(shell go env GOOS)
 
 GOTAGS += syso
 SYSOBJECT := $(LIB)_$(GOOS)_$(GOARCH).syso
@@ -32,4 +32,3 @@ install: $(SYSOBJECT)
 
 clean:
 	$(MAKE) -C "$(LIB)" clean
-
