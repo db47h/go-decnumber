@@ -34,7 +34,8 @@ const (
 //
 // Numbers should be created via the NewNumber() function.
 type Number struct {
-	dn *C.decNumber // Pointer to the embedded decNumber
+	dn  *C.decNumber // Pointer to the embedded decNumber
+	ctx *Context     // Context that created this number
 }
 
 // newNumber creates an uninitialized number with enough storage space to hold nDigits digits.
@@ -53,6 +54,19 @@ func newNumber(nDigits int32) *Number {
 func (n *Number) finalize() {
 	C.free(unsafe.Pointer(n.dn))
 	n.dn = nil
+	n.ctx = nil
+}
+
+// BindToContext binds Number n to Context c. Used by Context when created new numbers.
+func (n *Number) BindToContext(c *Context) {
+	n.ctx = c
+}
+
+// Release declares a Number as free for reuse and puts it back on the free list.
+func (n *Number) Release() {
+	if n.ctx != nil {
+		n.ctx.ReleaseNumber(n)
+	}
 }
 
 // Zero sets the value of a Number to zero.
@@ -85,40 +99,17 @@ func (n *Number) String() string {
 	return C.GoString(str)
 }
 
-//
-// Number related Context methods
-//
-
-// NewNumber returns, as a *Number, a new zero-initialized Number suitable for use in the given
-// context. i.e. with enough storage space to hold the context's required number of digits. If
-// memory cannot be allocated for the new number, the function will panic. Numbers are managed
-// in a free list. Once a program is done with a number, it should release it by calling
-// Context.FreeNumber()
-func (c *Context) NewNumber() *Number {
-	return c.fn.Get().Zero()
-}
-
-// NewNumberFromString converts a string to a new Number. It implements the to-number conversion from the arithmetic
+// FromString converts a string to a Number. It implements the to-number conversion from the arithmetic
 // specification.
 //
 // The length of the coefficient and the size of the exponent are checked by this routine, so the
 // correct error (Underflow or Overflow) can be reported or rounding applied, as necessary. If bad
 // syntax is detected, the result will be a quiet NaN.
-func (c *Context) NewNumberFromString(s string) *Number {
+func (n *Number) FromString(s string) *Number {
 	str := C.CString(s)
 	defer C.free(unsafe.Pointer(str))
-	n := c.NewNumber()
-	C.decNumberFromString(n.dn, str, &c.ctx)
+	C.decNumberFromString(n.dn, str, n.ctx.DecContext())
 	return n
-}
-
-// FreeNumber declares a Number as free for reuse and puts it back on the free list.
-//
-// WARNING: This function MUST be called on the same context that created the Number. Failing to do
-// so will result in unexpected crashes. The best way to prevent any mistake is to systematically place
-// a deferred call to this function right after creating a number.
-func (c *Context) FreeNumber(n *Number) {
-	c.fn.Put(n)
 }
 
 //
@@ -130,9 +121,9 @@ func (c *Context) FreeNumber(n *Number) {
 // res may be lhs and/or rhs (e.g., X=X+X)
 //
 // Returns res
-func (c *Context) NumberAdd(res *Number, lhs *Number, rhs *Number) *Number {
-	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, &c.ctx)
-	return res
+func (n *Number) Add(lhs *Number, rhs *Number) *Number {
+	C.decNumberAdd(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
+	return n
 }
 
 // NumberMultiply multiplies one number by another. Computes res = lhs * rhs.
@@ -140,9 +131,9 @@ func (c *Context) NumberAdd(res *Number, lhs *Number, rhs *Number) *Number {
 // res may be lhs and/or rhs (e.g., X=X*X)
 //
 // Returns res
-func (c *Context) NumberMultiply(res *Number, lhs *Number, rhs *Number) *Number {
-	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, &c.ctx)
-	return res
+func (n *Number) Multiply(lhs *Number, rhs *Number) *Number {
+	C.decNumberMultiply(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
+	return n
 }
 
 // NumberDivide divides one number by another. Computes res = lhs / rhs.
@@ -150,9 +141,9 @@ func (c *Context) NumberMultiply(res *Number, lhs *Number, rhs *Number) *Number 
 // res may be lhs and/or rhs (e.g., X=X/X)
 //
 // Returns res
-func (c *Context) NumberDivide(res *Number, lhs *Number, rhs *Number) *Number {
-	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, &c.ctx)
-	return res
+func (n *Number) Divide(lhs *Number, rhs *Number) *Number {
+	C.decNumberDivide(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
+	return n
 }
 
 // NumberPower raises a number to a power. Computes res = lhs ** rhs (lhs raised to the power of rhs).
@@ -174,9 +165,9 @@ func (c *Context) NumberDivide(res *Number, lhs *Number, rhs *Number) *Number {
 // error in rare cases.
 //
 // Returns res
-func (c *Context) NumberPower(res *Number, lhs *Number, rhs *Number) *Number {
-	C.decNumberPower(res.dn, lhs.dn, rhs.dn, &c.ctx)
-	return res
+func (n *Number) Power(lhs *Number, rhs *Number) *Number {
+	C.decNumberPower(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
+	return n
 }
 
 // NumberRescale forces exponent to a requested value. Computes res = op(lhs,rhs) where op adjusts the
@@ -186,7 +177,7 @@ func (c *Context) NumberPower(res *Number, lhs *Number, rhs *Number) *Number {
 // res may be lhs or rhs.
 //
 // Returns res
-func (c *Context) NumberRescale(res *Number, lhs *Number, rhs *Number) *Number {
-	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, &c.ctx)
-	return res
+func (n *Number) Rescale(lhs *Number, rhs *Number) *Number {
+	C.decNumberRescale(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
+	return n
 }

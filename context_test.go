@@ -10,7 +10,7 @@ import (
 )
 
 func TestNewContext(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	if d := ctx.Digits(); d != 34 {
 		t.Fatalf("Context init failed. Wrong number of digits. Got %d, expected 34", d)
 	}
@@ -30,7 +30,7 @@ func TestNewContext(t *testing.T) {
 }
 
 func TestContext_Rounding(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	er := dec.RoundUp
 	ctx.SetRounding(er)
 	if r := ctx.Rounding(); r != er {
@@ -40,7 +40,7 @@ func TestContext_Rounding(t *testing.T) {
 
 // Here, we test all status methods
 func TestContext_Status(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	// Status()
 	// NOTE: clients should only use the Status methods, not *s
 	s := ctx.Status()
@@ -77,7 +77,7 @@ func TestContext_Status(t *testing.T) {
 }
 
 func TestStatus_String(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	ctx.Status().Set(dec.DivisionByZero)
 	if s := ctx.Status().String(); s != "Division by zero" {
 		t.Fatalf("Wrong status to string conversion. Expected \"Division by zero\", got \"%s\"", s)
@@ -89,7 +89,7 @@ func TestStatus_String(t *testing.T) {
 }
 
 func TestContext_ErrorStatus(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	ctx.Status().Set(dec.DivisionByZero)
 	err := ctx.ErrorStatus()
 	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
@@ -98,7 +98,7 @@ func TestContext_ErrorStatus(t *testing.T) {
 }
 
 func TestStatus_ToError(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	err := ctx.Status().Set(dec.DivisionByZero).ToError()
 	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
 		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
@@ -106,7 +106,7 @@ func TestStatus_ToError(t *testing.T) {
 }
 
 func TestStatus_FromString(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal64)
+	ctx := dec.NewContext(dec.InitDecimal64, 0)
 	s := ctx.Status()
 	if s.Test(dec.Errors) {
 		t.Fatal("Invalid context") // status should be error free just after creation

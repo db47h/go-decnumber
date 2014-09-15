@@ -33,77 +33,10 @@ const (
 )
 
 // ContextKind to use when creating a new Context with NewContext()
-type ContextKind int32
-
-const (
-	InitBase       ContextKind = 0
-	InitDecimal32  ContextKind = 32
-	InitDecimal64  ContextKind = 64
-	InitDecimal128 ContextKind = 128
-	// Synonyms
-	InitSingle ContextKind = InitDecimal32
-	InitDouble ContextKind = InitDecimal64
-	InitQuad   ContextKind = InitDecimal128
-)
-
-// Limits for the digits, emin and emax parameters in NewCustomContext()
-const (
-	MaxDigits = 999999999
-	MinDigits = 1
-	MaxEMax   = 999999999
-	MinEMax   = 0
-	MaxEMin   = 0
-	MinEMin   = -999999999
-	MaxMath   = 999999
-)
-
-// free list of numbers
-type freeNumberList struct {
-	size int32 // number of digits. Needed to create new numbers of the proper size
-	ch   chan *Number
-}
-
-// Get a *Number from the list or create a new one
-func (l *freeNumberList) Get() *Number {
-	select {
-	case n := <-l.ch:
-		return n
-	default:
-	}
-	return newNumber(l.size)
-}
-
-// Put back a *Number in the free list
-func (l *freeNumberList) Put(n *Number) {
-	select {
-	case l.ch <- n:
-	default:
-	}
-}
-
-// A Context wraps a decNumber context, the data structure used for providing the context
-// for operations and for managing exceptional conditions.
 //
-// Contexts must be created using the NewContext() or NewCustomContext() functions.
+// The settings for a context are as follows, depending on the ContextKind value:
 //
-// Most accessor and status manipulation functions (one liners) have be rewriten in pure Go in
-// order to allow inlining and improve performance.
-type Context struct {
-	ctx C.decContext
-	fn  *freeNumberList
-}
-
-// NewContext creates a new context of the requested kind.
-//
-// Although the native byte order should be properly detected at build time, NewContext() will
-// check the runtime byte order and panic if the byte order is not set correctly. If your code panics
-// on this check, please file a bug report. New context will also panic if initialized with an
-// Unsupported ContextKind.
-//
-// The Context is setup as follows, depending on the specified ContextKind:
-//
-// InitBase : do not use this setting as EMin and EMax will be out of bounds for most arithmetic operations. Use
-// NewCustomContext() instead.
+// InitBase
 //
 //	digits = 9
 //	emax = 999999999
@@ -134,8 +67,81 @@ type Context struct {
 //	emin = -6143
 //	rouning = RoundHalfEven
 //	clamp = 1
+type ContextKind int32
+
+const (
+	InitBase       ContextKind = 0
+	InitDecimal32  ContextKind = 32
+	InitDecimal64  ContextKind = 64
+	InitDecimal128 ContextKind = 128
+	// Synonyms
+	InitSingle ContextKind = InitDecimal32
+	InitDouble ContextKind = InitDecimal64
+	InitQuad   ContextKind = InitDecimal128
+)
+
+// Limits for the digits, emin and emax parameters in NewCustomContext()
+const (
+	MaxDigits = 999999999
+	MinDigits = 1
+	MaxEMax   = 999999999
+	MinEMax   = 0
+	MaxEMin   = 0
+	MinEMin   = -999999999
+	MaxMath   = 999999
+)
+
+// free list of numbers
+type freeNumberList struct {
+	digits int32 // number of digits. Needed to create new numbers of the proper size
+	ch     chan *Number
+}
+
+// Get a *Number from the list or create a new one
+func (l *freeNumberList) Get() *Number {
+	select {
+	case n := <-l.ch:
+		return n
+	default:
+	}
+	return newNumber(l.digits)
+}
+
+// Put back a *Number in the free list
+func (l *freeNumberList) Put(n *Number) {
+	select {
+	case l.ch <- n:
+	default:
+	}
+}
+
+// A Context wraps a decNumber context, the data structure used for providing the context
+// for operations and for managing exceptional conditions.
 //
-func NewContext(kind ContextKind) (pContext *Context) {
+// Contexts must be created using the NewContext() or NewCustomContext() functions.
+//
+// Most accessor and status manipulation functions (one liners) have be rewriten in pure Go in
+// order to allow inlining and improve performance.
+type Context struct {
+	ctx C.decContext
+	fn  *freeNumberList
+}
+
+// NewContext creates a new context of the requested kind.
+//
+// digits is used to set the precision to be used for an operation. The result of an
+// operation will be rounded to this length if necessary. digits should be in [MinDigits, MaxDigits].
+// The maximum supported value for digits in many arithmetic operations is MaxMath. If digits is 0,
+// the context will be configured use the default number of digits according to ContextKind.
+//
+// Note that the default exponent settings for InitBase will be too large for many arithmetic
+// operations. These defaults can be adjusted with SetEMax(), SetEMin(), SetRounding() and SetClamp().
+//
+// Although the native byte order should be properly detected at build time, NewContext() will
+// check the runtime byte order and panic if the byte order is not set correctly. If your code panics
+// on this check, please file a bug report. New context will also panic if initialized with an
+// Unsupported ContextKind.
+func NewContext(kind ContextKind, digits int32) (pContext *Context) {
 	if C.decContextTestEndian(1) != 0 {
 		panic("Wrong byte order for this architecture. Please file a bug report.")
 	}
@@ -146,37 +152,69 @@ func NewContext(kind ContextKind) (pContext *Context) {
 		panic("Unsupported context kind.")
 	}
 	pContext.ctx.traps = 0 // disable traps
+	if digits != 0 {
+		pContext.ctx.digits = C.int32_t(digits)
+	}
 	pContext.fn = &freeNumberList{int32(pContext.ctx.digits), make(chan *Number, FreeListSize)}
 	return
 }
 
-// NewCustom context returns a new Context setup with the requested parameters.
+// DecContext returns a pointer to the underlying decContext C struct
+func (c *Context) DecContext() *C.decContext {
+	return &c.ctx
+}
+
+// Digits gets the working precision
+func (c *Context) Digits() int32 {
+	return int32(c.ctx.digits)
+}
+
+// EMin returns the Context's EMin setting
+func (c *Context) EMin() int32 {
+	return int32(c.ctx.emin)
+}
+
+// SetEMin sets the Context's EMin setting to the specified value.
 //
-// digits is used to set the precision to be used for an operation. The result of an
-// operation will be rounded to this length if necessary. digits should be in [MinDigits, MaxDigits].
-// The maximum supported value for digits in many arithmetic operations is MaxMath.
-//
-// emax is used to set the magnitude of the largest adjusted exponent that is
-// permitted. The adjusted exponent is calculated as though the number were expressed in
-// scientific notation (that is, except for 0, expressed with one non-zero digit before the
-// decimal point).
-// If the adjusted exponent for a result or conversion would be larger than emax then an
-// overflow results. emax should be in [MinEMax, MaxEMax]. The maximum supported value for iemax
-// in many arithmetic operations is MaxMath.
-//
-// emin is used to set the smallest adjusted exponent that is permitted for normal
+// EMin is used to set the smallest adjusted exponent that is permitted for normal
 // numbers. The adjusted exponent is calculated as though the number were expressed in
 // scientific notation (that is, except for 0, expressed with one non-zero digit before the
 // decimal point).
 // If the adjusted exponent for a result or conversion would be smaller than emin then the
 // result is subnormal. If the result is also inexact, an underflow results. The exponent of
-// the smallest possible number (closest to zero) will be emin-digits+1. emin is usually set to
-// -emax or to -(emax-1). emin should be in [MinEMin, MaxEMin]. The minimum supported value for
-// emin in many arithmetic operations is -MaxMath.
+// the smallest possible number (closest to zero) will be emin-digits+1. EMin is usually set to
+// -EMax or to -(EMax-1). EMin should be in [MinEMin, MaxEMin]. The minimum supported value for
+// EMin in many arithmetic operations is -MaxMath.
+func (c *Context) SetEMin(eMin int32) *Context {
+	c.ctx.emin = C.int32_t(eMin)
+	return c
+}
+
+// EMax returns the Context's EMax setting.
+func (c *Context) EMax() int32 {
+	return int32(c.ctx.emax)
+}
+
+// SetEMax sets the Context's EMax setting to the specified value.
 //
-// round is used to select the rounding algorithm to be used if rounding is
-// necessary during an operation. It must be one of the values in the Rounding
-// enumeration.
+// EMax is used to set the magnitude of the largest adjusted exponent that is
+// permitted. The adjusted exponent is calculated as though the number were expressed in
+// scientific notation (that is, except for 0, expressed with one non-zero digit before the
+// decimal point).
+// If the adjusted exponent for a result or conversion would be larger than emax then an
+// overflow results. EMax should be in [MinEMax, MaxEMax]. The maximum supported value for EMax
+// in many arithmetic operations is MaxMath.
+func (c *Context) SetEMax(eMax int32) *Context {
+	c.ctx.emax = C.int32_t(eMax)
+	return c
+}
+
+// Clamp returns the Context's clamping setting
+func (c *Context) Clamp() int8 {
+	return int8(c.ctx.clamp)
+}
+
+// SetClamp sets the Context's Clamp setting to the specified value.
 //
 // clamp controls explicit exponent clamping, as is applied when a result is
 // encoded in one of the compressed formats. When 0, a result exponent is limited to a
@@ -190,41 +228,9 @@ func NewContext(kind ContextKind) (pContext *Context) {
 // 90] if clamp were 1.
 // Also when 1, clamp limits the length of NaN payloads to digits-1 (rather than digits) when
 // constructing a NaN by conversion from a string.
-func NewCustomContext(digits int32, emax int32, emin int32, round Rounding, clamp uint8) (pContext *Context) {
-	if C.decContextTestEndian(1) != 0 {
-		panic("Wrong byte order for this architecture. Please file a bug report.")
-	}
-	pContext = new(Context)
-	c := &pContext.ctx
-	C.decContextDefault(c, C.DEC_INIT_BASE)
-	c.digits = C.int32_t(digits)
-	c.emax = C.int32_t(emax)
-	c.emin = C.int32_t(emin)
-	c.round = uint32(round) // weird type for enums
-	c.clamp = C.uint8_t(clamp)
-	c.traps = 0 // disable traps
-	pContext.fn = &freeNumberList{int32(c.digits), make(chan *Number, FreeListSize)}
-	return
-}
-
-// Digits gets the working precision
-func (c *Context) Digits() int32 {
-	return int32(c.ctx.digits)
-}
-
-// EMin returns the Context's EMin setting
-func (c *Context) EMin() int32 {
-	return int32(c.ctx.emin)
-}
-
-// EMax returns the Context's EMax setting
-func (c *Context) EMax() int32 {
-	return int32(c.ctx.emax)
-}
-
-// Clamp returns the Context's clamping setting
-func (c *Context) Clamp() int8 {
-	return int8(c.ctx.clamp)
+func (c *Context) SetClamp(clamp int8) *Context {
+	c.ctx.clamp = C.uint8_t(clamp)
+	return c
 }
 
 // Rounding gets the rounding mode
@@ -234,9 +240,13 @@ func (c *Context) Rounding() Rounding {
 }
 
 // SetRounding sets the rounding mode
-func (c *Context) SetRounding(newRounding Rounding) *Context {
-	// C.decContextSetRounding(&c.ctx, uint32(newRounding))
-	c.ctx.round = uint32(newRounding) // C enums have a Go type, not C
+//
+// iRounding is used to select the rounding algorithm to be used if rounding is
+// necessary during an operation. It must be one of the values in the Rounding
+// enumeration.
+func (c *Context) SetRounding(round Rounding) *Context {
+	// C.decContextSetRounding(&c.ctx, uint32(round))
+	c.ctx.round = uint32(round) // C enums have a Go type, not C
 	return c
 }
 
@@ -261,4 +271,22 @@ func (c *Context) ErrorStatus() error {
 func (c *Context) ZeroStatus() *Context {
 	c.ctx.status = 0
 	return c
+}
+
+// NewNumber returns, as a *Number, a new zero-initialized Number suitable for use in the given
+// context. i.e. with enough storage space to hold the context's required number of digits. If
+// memory cannot be allocated for the new number, the function will panic. Numbers are managed
+// in a free list. Once a program is done with a number, it should release it by calling
+// Release()
+func (c *Context) NewNumber() (n *Number) {
+	n = c.fn.Get().Zero()
+	n.BindToContext(c)
+	return
+}
+
+// ReleaseNumber declares a Number as free for reuse and puts it back on the free list.
+// For internal use. Use Number.Release() instead.
+func (c *Context) ReleaseNumber(n *Number) {
+	n.BindToContext(nil) // break cyclic reference
+	c.fn.Put(n)
 }

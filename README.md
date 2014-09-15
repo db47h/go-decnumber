@@ -3,15 +3,25 @@
 go-decnumber is a go wrapper package around the [libDecnumber library][lib].
 
 This is a work in progress. The API is in a more or less final state, all the decContext functions
-have been implemented, but most decNumber functions are still missing, and there is no decQuad implementation yet.
+have been implemented, but most decNumber functions are still missing, and there is no decQuad
+implementation yet.
 
 [lib]: http://speleotrove.com/decimal/decnumber.html
 
 # Implementation details
 
-The decNumber package is split into modules: the decContext module (required), the decNumber module (for arbitrary precision arithmetic), *float* modules, namely decSingle, decDouble and decQuad, and a few other modules for conversion between various formats. The *float* modules are based on the 32-bit, 64-bit, and 128-bit decimal types in the IEEE 754 Standard for Floating Point Arithmetic. In contrast to the arbitrary-precision decNumber module, these modules work directly from the decimal-encoded formats designed by the IEEE 754 committee. Their implementation is also faster: an Add() with 34 digits numbers takes 433 cycles with de decQuad module versus 1180 for the decNumber module.
+The decNumber package is split into modules: the decContext module (required), the decNumber module
+(for arbitrary precision arithmetic), *float* modules, namely decSingle, decDouble and decQuad, and
+a few other modules for conversion between various formats. The *float* modules are based on the
+32-bit, 64-bit, and 128-bit decimal types in the IEEE 754 Standard for Floating Point Arithmetic. In
+contrast to the arbitrary-precision decNumber module, these modules work directly from the
+decimal-encoded formats designed by the IEEE 754 committee. Their implementation is also faster: an
+Add() with 34 digits numbers takes 433 cycles with de decQuad module versus 1180 for the decNumber
+module.
 
-Note that there is no *standard* libdecnumber.so. The decNumber package is provided as-is, with no makefile to make a shared library out of it (the Makefile in this repository is not part of the original decNumber archive and is only a test).
+Note that there is no *standard* libdecnumber.so. The decNumber package is provided as-is, with no
+makefile to make a shared library out of it (the Makefile in this repository is not part of the
+original decNumber archive and is only a test).
 
 From a C programming perspective, all one has to do to compile code for decNumber is:
 
@@ -21,13 +31,27 @@ or if only decNumber is needed:
 
 	gcc mysource.c decContext.c decNumber.c -o myprogram
 
-My initial intent was to split the wrapper into modules, in the same way as the C code. However, this lead to unsolvable compilation issues, like missing references in the Number module to the Context module. This is a no-Go (sorry) without shared libraries. However, I did not want to force the end-user of the package to build and install a custom shared library, and considering the design decisions discussed in the next section, I ended up making a monolithic package around decNumber and decContext.
+My initial intent was to split the wrapper into modules, in the same way as the C version. However,
+this lead to unsolvable compilation issues, like missing references in the Number (Go) module to the
+decContext (C) module. This is currently a no-Go (sorry) without shared libraries. However, I did
+not want to force the end-user of the package to build and install a custom shared library, and I
+also wanted the packege to be `go get`'able. Also considering the design decisions discussed in the
+next section, I ended up making a monolithic package around decNumber and decContext.
 
-The usual way to link Go code against a static library is to use a `#cgo LDFLAGS: static/patch/to/lib/lib.a` directive. Since this package is meant to be imported into other projects, using LDFLAGS was not possible without some standardized/portable/flexible way to specify the path to the static library (whatever a package puts into LDFLAGS propagates to the project importing it). I also wanted the package to be `go get`able.
+The usual way to link Go code against a static library is to use a `#cgo LDFLAGS:
+static/patch/to/lib/lib.a` directive. Since this package is meant to be imported into other
+projects, using LDFLAGS was not possible without some standardized/portable/flexible way to specify
+the path to the static library (whatever a package puts into LDFLAGS propagates to the project
+importing it).
 
-The trick to make it work is to use Go source files as wrappers around the relevant C files and `#include` them. This works quite well, except for long build times and a weird behaviour of `go test` if not using a relative import path in test source files. The files decContext.go and decNumber.go just do this: include the corresponding C file. See the topic about building/installing for more options.
+The trick to make it work is to use Go source files as wrappers around the relevant C files and
+`#include` them. This works quite well, except for long build times and a weird behaviour of `go
+test` if not using a relative import path in test source files. The files decContext.go and
+decNumber.go just do this: include the corresponding C file. See the topic about building/installing
+for more options.
 
-Most of the short C functions (accessors) have been reimplemented in Go in order to improve performance. Use
+Most of the short C functions (accessors) have been reimplemented in Go in order to improve
+performance. Use
 
 	go build -gcflags=-m . 2>&1 | grep inline
 
@@ -35,49 +59,82 @@ to check which functions can be inlined.
 
 ## Numbers, Context and precision
 
-The decNumber module can be built to use fixed precision numbers or arbitrary precision (changeable at runtime), or a mix of both. In order to make things easier and more flexible for the clients of the package, the decNumber module is setup for arbitrary precision numbers.
+The decNumber module can be built to use fixed precision numbers or arbitrary precision (changeable
+at runtime), or a mix of both. In order to make things easier and more flexible for the clients of
+this package, the decNumber module is setup for arbitrary precision numbers.
 
-The precision is held in a decContext structure and numbers are held in a decNumber structure. The caveat is that when dealing with arbitrary precision, the decNumber structures do not keep track of how many digits they can hold. It's up to the programmer to keep track of which decNumber structure was created to be used in a given context.
+The precision is held in a decContext structure and numbers are held in a decNumber structure. The
+caveat is that when dealing with arbitrary precision, the decNumber structures do not keep track of
+how many digits they can hold. It's up to the programmer to keep track of which decNumber structure
+was created to be used in a given context.
 
 A concrete example, the function Exp() is defined like this:
 
 	decNumber * decNumberExp(decNumber *res, const decNumber *rhs, decContext *set)
 
-It will set *res* to *e* raised to the power of *rhs*. The *rhs* operand can be in any precision (i.e. context independent). However, *\*res*, the decNumber structure that will hold the result, has to have enough storage space to hold the precision specified in the decContext *set*.
+It will set *res* to *e* raised to the power of *rhs*. The *rhs* operand can be in any precision
+(i.e. context independent). However, \**res*, the decNumber structure that will hold the result, has
+to have enough storage space to hold the precision specified in the decContext *set*.
 
-In a top-down functional programming model, this is not a serious issue. However, with goroutines flying all over the place, this can get messy. This lead to a few design choices in the go implementation, and try to make the API as Go-like as I could:
+In a top-down functional programming model, this is not a serious issue. However, with goroutines
+flying all over the place, this can get messy. This lead to a few design choices in the go
+implementation. I also tried to make the API as Go-like as I could:
 
-- The configuration of a Context is immutable after creation (i.e. cannot change the number of digits, minimum and maximum exponents). Only rounding and status are alterable. If one needs to change precision on the fly, discard the existing context and create a new one with the required precision. Existing Numbers are still usable and valid Numbers.
-- Contexts hold a free list of Numbers and Numbers are created by a method of Context. This gives the following idiomatic code for temporary Number creation:
+- Contexts are created with a immutable precision (i.e. number of digits). If one needs to change
+  precision on the fly, discard the existing context and create a new one with the required precision.
+- Numbers are created by a method of Context.
+- From a programming standpoint, any Number is a valid number as an operand in arithmetic
+  operations, regardless of the settings or existence of its creator Context (not to be confused
+  with having a valid value in a given arithmetic operation).
+- Numbers hold a pointer to the Context that created them.
+- Contexts hold a free list of Numbers. When a Number is free for re-use, it should be released.
+  This gives the following idiomatic code for temporary Number creation:
 
-	num := ctx.NewNumber()
-	defer ctx.FreeNumber(num)
+	num := context.NewNumber()
+	defer num.Release()
 
-- Freeing numbers is not mandatory. The FreeNumber method() only returns it to the free list. When a Number is not returned to the free-list and goes out of scope, it will be handled normally by the garbage collector and any allocated memory freed via an internal SetFinalizer() call. However:
-  - A Number must not be used by the caller after calling FreeNumber()
-  - FreeNumber() must be called on the Context that created it. If for some reason keeping track of this is not possible, just don't call FreeNumber().
-- Arithmetic functions are Context methods. Aside from the Context parameter, we use the same calling convention than in decNumber. That is:
+- Release() takes care of breaking circular references (Number->Context->FreeList->Number) by
+  setting the context pointer to nil before release.
+- Releasing numbers is not mandatory. The Release() method only returns it to the free list. When a
+  Number is not returned to the free-list and goes out of scope, it will be handled normally by the
+  garbage collector and any allocated memory freed via an internal SetFinalizer() call.
+- Numbers must not be used by the caller after calling Release() (hence the idiomatic use of defer
+  for this).
+- Arithmetic functions are Number methods. The value of the receiver of the method will be set to
+  the result of the operation. For example:
+		
+	n.Add(x, y) // n = x + y
 
-	result = ctx.NumberAdd(result, x, y) // result = x + y
+- Arithmetic methods always return the receiver in order to allow chain calling:
 
-Regarding this last point, my initial intent was to do something like `res := ctx.NumberAdd(x,y)` which would always return a new Number taken from the free-list. However, this complicated clean reuse of Numbers. For example, example 2 would have been written like this for the rate computation:
+	n.Add(x, y).Multiply(n, z) // n = (x + y) * z
 
-	rate = ctx.NumberDivide(rate, hundred)        // rate=rate/100
-	rate = ctx.NumberAdd(rate, one)               // rate=rate+1
-	rate = ctx.NumberPower(rate, years)           // rate=rate**years
+- Using the same number as operand and result, like in `n.Multiply(n, n)`, is legal and will not
+  produce unexpected results.
 
-The previous *rate* is dereferenced at each called and free for garbage collection with no chance to send it back to the free-list. Even if the free-list did not Zero() the numbers, we would have to to something like this:
+## example use
 
-	rate = ctx.NumberDivide(ctx.FreeNumber(rate), hundred)
-
-which is not good either from a usability and performance standpoint.
-
-As a more concrete usage example, in a calculator application we have:
+A concrete usage example of the fixed context precision and free-lists could be a calculator
+application where we have:
 
 - a global context
 - a global stack of numbers (implemented as a slice)
 
-For all arithmetic computations, temporary numbers, etc., we use the idiomatic deferred call to FreeNumber(). When numbers get pushed off the stack, they are just discarded, without a call to FreeNumber(). When the user requests a change in precision, the global context is replaced by a newly created one with the requested precision. Numbers present on the stack are kept as is since they are still valid Numbers when used as operands in arithmetic functions.
+For all arithmetic computations, temporary numbers, etc., we use the idiomatic deferred call to
+Release(). When computing the addition of the top two number, the
+
+	X, Y = := globalStack.Pop2()               // pop top 2 numbers off the stack
+	result := globalCtx.NewNumber().Add(X, Y)  
+	X.Release()                                // send X and Y back to their creator
+	Y.Release()	
+	globalStack.Push(result)                   // push the result on top of the stack
+
+When the user requests a change in precision, the global context is replaced by a newly created one
+with the requested precision. Numbers present on the stack are kept as is since they are still valid
+Numbers when used as operands in arithmetic functions. New operations will be performed using the
+new context precision since we make sure that every operation is done with a freshly created Number
+for its result.
+
 
 ## Threading, goroutines
 
@@ -91,7 +148,7 @@ Right now, go-decnumber only supports decNumber. Adding support for any of the *
 - Adding the relevant methods to the Context type
 - A free list is less necessary for the float types since their size is static (128 bits), unlike Number which has a variable size (depending on the Context's precision) and require malloc/feee calls. Quads that are not used outside of a function body should be allocated on the stack (to be tested).
 
-Another thing to consider is that for the float types, the Context is used only for error checking and rounding mode. Defining a Context interface with a Number and Quad implementation could also be a solution.
+Another thing to consider is that for the float types, the Context is used only for error checking and rounding mode. Defining a Context interface with a Number and Quad implementation could also be a good idea.
 
 # Building / Installing
 
@@ -129,7 +186,6 @@ In the early days of the package, running tests using the Go->C wrappers (for on
 
 # TODO
 
-- CreateNewCustomContext() is just plain ugly. Implement SetDigits() and re-create the free-list in it. But Need to add a pointer to the freelist as a member of Number (pointer needs to be cleared when puting it back, avoid circular deps).
 - Implement basic math functions.
 
 # Licensing
