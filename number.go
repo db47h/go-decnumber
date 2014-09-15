@@ -47,7 +47,6 @@ func newNumber(nDigits int32) *Number {
 		panic("Malloc failed")
 	}
 	runtime.SetFinalizer(num, (*Number).finalize)
-	// C.decNumberZero(num.n)
 	return num
 }
 
@@ -90,12 +89,13 @@ func (n *Number) String() string {
 // Number related Context methods
 //
 
-// NewNumber returns a new Number suitable for use in the given context. i.e. with enough storage space
-// to hold the context's required number of digits. If memory cannot be allocated for the new number,
-// the function will panic. Numbers are managed in a free list. Once a program is done with a number, it
-// should release it by calling Context.FreeNumber()
+// NewNumber returns, as a *Number, a new zero-initialized Number suitable for use in the given
+// context. i.e. with enough storage space to hold the context's required number of digits. If
+// memory cannot be allocated for the new number, the function will panic. Numbers are managed
+// in a free list. Once a program is done with a number, it should release it by calling
+// Context.FreeNumber()
 func (c *Context) NewNumber() *Number {
-	return c.fn.Get()
+	return c.fn.Get().Zero()
 }
 
 // NewNumberFromString converts a string to a new Number. It implements the to-number conversion from the arithmetic
@@ -118,8 +118,7 @@ func (c *Context) NewNumberFromString(s string) *Number {
 // so will result in unexpected crashes. The best way to prevent any mistake is to systematically place
 // a deferred call to this function right after creating a number.
 func (c *Context) FreeNumber(n *Number) {
-	// zero it before pushing it back
-	c.fn.Put(n.Zero())
+	c.fn.Put(n)
 }
 
 //

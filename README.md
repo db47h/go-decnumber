@@ -53,14 +53,24 @@ In a top-down functional programming model, this is not a serious issue. However
 	num := ctx.NewNumber()
 	defer ctx.FreeNumber(num)
 
-- Arithmetic functions are Context methods and always return a new Number taken from the free list. This leads to the same idiomatic code than NewNumber:
-
-	num := ctx.NumberAdd(x, y)
-	defer ctx.FreeNumber(num)
-
-- Freeing numbers is not mandatory. The FreeNumber method() only returns it to the free list. Actual resource cleanup is handled by the garbage collector and an internal call to SetFinalizer(). However:
+- Freeing numbers is not mandatory. The FreeNumber method() only returns it to the free list. When a Number is not returned to the free-list and goes out of scope, it will be handled normally by the garbage collector and any allocated memory freed via an internal SetFinalizer() call. However:
   - A Number must not be used by the caller after calling FreeNumber()
   - FreeNumber() must be called on the Context that created it. If for some reason keeping track of this is not possible, just don't call FreeNumber().
+- Arithmetic functions are Context methods. Aside from the Context parameter, we use the same calling convention than in decNumber. That is:
+
+	result = ctx.NumberAdd(result, x, y) // result = x + y
+
+Regarding this last point, my initial intent was to do something like `res := ctx.NumberAdd(x,y)` which would always return a new Number taken from the free-list. However, this complicated clean reuse of Numbers. For example, example 2 would have been written like this for the rate computation:
+
+	rate = ctx.NumberDivide(rate, hundred)        // rate=rate/100
+	rate = ctx.NumberAdd(rate, one)               // rate=rate+1
+	rate = ctx.NumberPower(rate, years)           // rate=rate**years
+
+The previous *rate* is dereferenced at each called and free for garbage collection with no chance to send it back to the free-list. Even if the free-list did not Zero() the numbers, we would have to to something like this:
+
+	rate = ctx.NumberDivide(ctx.FreeNumber(rate), hundred)
+
+which is not good either from a usability and performance standpoint.
 
 As a more concrete usage example, in a calculator application we have:
 
@@ -79,9 +89,9 @@ Right now, go-decnumber only supports decNumber. Adding support for any of the *
 
 - Adding the relevant type in the decnumber module
 - Adding the relevant methods to the Context type
-- A free list is less necessary for the float types since their size is static (up to 128 bits), unlike Number which s a variable size (depending on the Context's precision) and require malloc/feee calls. Quads that are not used outside of a function body should be allocated on the stack (to be tested).
+- A free list is less necessary for the float types since their size is static (128 bits), unlike Number which has a variable size (depending on the Context's precision) and require malloc/feee calls. Quads that are not used outside of a function body should be allocated on the stack (to be tested).
 
-Another thing to consider is that for the float types, the Context is used only for error checking and rounding mode. Defining a Context interface with a Number and Quad implementation could be a solution.
+Another thing to consider is that for the float types, the Context is used only for error checking and rounding mode. Defining a Context interface with a Number and Quad implementation could also be a solution.
 
 # Building / Installing
 
