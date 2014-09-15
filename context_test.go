@@ -111,19 +111,19 @@ func TestStatus_FromString(t *testing.T) {
 	if s.Test(dec.Errors) {
 		t.Fatal("Invalid context") // status should be error free just after creation
 	}
-	_, err := s.SetFromString("Division by zero")
+	err := s.SetFromString("Division by zero")
 	if err != nil || *s != dec.DivisionByZero {
 		t.Fatalf("SetFromString failed. Got %x (%v)", *s, err)
 	}
-	_, err = s.SetFromString("Invalid operation")
+	err = s.SetFromString("Invalid operation")
 	if err != nil || *s != dec.DivisionByZero|dec.InvalidOperation {
 		t.Fatalf("SetFromString failed. Got %x (%v)", *s, err)
 	}
-	_, err = s.SetFromString("Multiple status")
+	err = s.SetFromString("Multiple status")
 	if err == nil || err.Error() != "Conversion syntax" {
 		t.Fatal("SetFromString should have failed.")
 	}
-	_, err = s.SetFromString("foobar")
+	err = s.SetFromString("foobar")
 	if err == nil || err.Error() != "Conversion syntax" {
 		t.Fatal("SetFromString should have failed.")
 	}

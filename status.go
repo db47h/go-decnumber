@@ -67,15 +67,16 @@ func (s *Status) String() string {
 // returned by Status.String().
 // The status bit corresponding to the string is set.
 //
-// Returns s and a non-nil ContextError if str was equal to "Multiple status" or was not recognized.
-func (s *Status) SetFromString(str string) (*Status, error) {
+// Returns a non-nil ContextError if str was equal to "Multiple status" or was not recognized.
+func (s *Status) SetFromString(str string) error {
 	for k, v := range statusString {
 		if v == str {
-			return s.Set(k), nil
+			s.Set(k)
+			return nil
 		}
 	}
 	err := ConversionSyntax
-	return s, err.ToError()
+	return err.ToError()
 }
 
 // Set sets one or more status bits in the status field. Since traps are
@@ -139,6 +140,18 @@ func (s *Status) Restore(newStatus Status, mask Status) *Status {
 // a ContextError if any, nil otherwise.
 // Convert the return value with err.(decnumber.ContextError) to compare it
 // against any of the Status values.
+//
+// Status bits considered errors are:
+//
+//	DivisionByZero
+//	ConversionSyntax
+//	DivisionImpossible
+//	DivisionUndefined
+//	InsufficientStorage
+//	InvalidContext
+//	InvalidOperation
+//	Overflow
+//	Underflow
 func (s *Status) ToError() error {
 	if e := *s & Errors; e != 0 {
 		return ContextError(e)
