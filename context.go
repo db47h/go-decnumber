@@ -36,6 +36,7 @@ const (
 type ContextKind int32
 
 const (
+	InitBase       ContextKind = 0
 	InitDecimal32  ContextKind = 32
 	InitDecimal64  ContextKind = 64
 	InitDecimal128 ContextKind = 128
@@ -96,14 +97,21 @@ type Context struct {
 //
 // Although the native byte order should be properly detected at build time, NewContext() will
 // check the runtime byte order and panic if the byte order is not set correctly. If your code panics
-// on this check, please file a bug report. Providing in an invalid ContextKind will also
-// cause your code to panic; this is by design.
-//
-// For arbitrary precision arithmetic, use NewCustomContext() instead.
+// on this check, please file a bug report. New context will also panic if initialized with an
+// Unsupported ContextKind.
 //
 // The Context is setup as follows, depending on the specified ContextKind:
 //
-// InitDecimal32 (32 bits precision):
+// InitBase : do not use this setting as EMin and EMax will be out of bounds for most arithmetic operations. Use
+// NewCustomContext() instead.
+//
+//	digits = 9
+//	emax = 999999999
+//	emin = -999999999
+//	rouning = RoundHalfUp
+//	clamp = 0
+//
+// InitDecimal32
 //
 //	digits = 7
 //	emax = 96
@@ -111,7 +119,7 @@ type Context struct {
 //	rouning = RoundHalfEven
 //	clamp = 1
 //
-// InitDecimal64 (64 bits precision):
+// InitDecimal64
 //
 //	digits = 16
 //	emax = 384
@@ -119,7 +127,7 @@ type Context struct {
 //	rouning = RoundHalfEven
 //	clamp = 1
 //
-// InitDecimal128 (128 bits precision):
+// InitDecimal128
 //
 //	digits = 34
 //	emax = 6144
@@ -131,11 +139,12 @@ func NewContext(kind ContextKind) (pContext *Context) {
 	if C.decContextTestEndian(1) != 0 {
 		panic("Wrong byte order for this architecture. Please file a bug report.")
 	}
-	if kind != InitDecimal32 && kind != InitDecimal64 && kind != InitDecimal128 {
-		panic("Unsupported context kind.")
-	}
 	pContext = new(Context)
 	C.decContextDefault(&pContext.ctx, C.int32_t(kind))
+	if pContext.Status().Test(Errors) {
+		// Happens if kind not in [0, 32, 64, 128]
+		panic("Unsupported context kind.")
+	}
 	pContext.ctx.traps = 0 // disable traps
 	pContext.fn = &freeNumberList{int32(pContext.ctx.digits), make(chan *Number, FreeListSize)}
 	return
@@ -243,4 +252,13 @@ func (c *Context) Status() *Status {
 // against any of the Status values. This is a shorthand for Context.Status().ToError()
 func (c *Context) ErrorStatus() error {
 	return c.Status().ToError()
+}
+
+// ZeroStatus is used to clear (set to zero) all the status bits of the context.
+// This is a shorthand for Status().Zero() that makes chain calling easier.
+//
+// Returns c.
+func (c *Context) ZeroStatus() *Context {
+	c.ctx.status = 0
+	return c
 }
