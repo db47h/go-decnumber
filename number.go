@@ -118,37 +118,29 @@ func (n *Number) FromString(s string) *Number {
 
 // NumberAdd adds two numbers. Computes res = lhs + rhs.
 //
-// res may be lhs and/or rhs (e.g., X=X+X)
-//
 // Returns res
-func (n *Number) Add(lhs *Number, rhs *Number) *Number {
-	C.decNumberAdd(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
-	return n
+func (res *Number) Add(lhs *Number, rhs *Number) *Number {
+	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+	return res
 }
 
 // NumberMultiply multiplies one number by another. Computes res = lhs * rhs.
 //
-// res may be lhs and/or rhs (e.g., X=X*X)
-//
 // Returns res
-func (n *Number) Multiply(lhs *Number, rhs *Number) *Number {
-	C.decNumberMultiply(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
-	return n
+func (res *Number) Multiply(lhs *Number, rhs *Number) *Number {
+	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+	return res
 }
 
 // NumberDivide divides one number by another. Computes res = lhs / rhs.
 //
-// res may be lhs and/or rhs (e.g., X=X/X)
-//
 // Returns res
-func (n *Number) Divide(lhs *Number, rhs *Number) *Number {
-	C.decNumberDivide(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
-	return n
+func (res *Number) Divide(lhs *Number, rhs *Number) *Number {
+	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+	return res
 }
 
 // NumberPower raises a number to a power. Computes res = lhs ** rhs (lhs raised to the power of rhs).
-//
-// res may be lhs and/or rhs (e.g., X=X**X)
 //
 // Mathematical function restrictions apply; a NaN is
 // returned with Invalidoperation if a restriction is violated.
@@ -165,19 +157,17 @@ func (n *Number) Divide(lhs *Number, rhs *Number) *Number {
 // error in rare cases.
 //
 // Returns res
-func (n *Number) Power(lhs *Number, rhs *Number) *Number {
-	C.decNumberPower(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
-	return n
+func (res *Number) Power(lhs *Number, rhs *Number) *Number {
+	C.decNumberPower(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+	return res
 }
 
 // NumberRescale forces exponent to a requested value. Computes res = op(lhs,rhs) where op adjusts the
 // coefficient of res (by rounding or shifting) such that the exponent (-scale) of res has the value rhs.
 // The numerical value of res will equal lhs, except for the effects of any rounding that occurred.
 //
-// res may be lhs or rhs.
-//
 // Returns res
-func (n *Number) Rescale(lhs *Number, rhs *Number) *Number {
-	C.decNumberRescale(n.dn, lhs.dn, rhs.dn, n.ctx.DecContext())
-	return n
+func (res *Number) Rescale(lhs *Number, rhs *Number) *Number {
+	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+	return res
 }
