@@ -34,32 +34,33 @@ const (
 //
 // Numbers should be created via the NewNumber() function.
 type Number struct {
-	n *C.decNumber // Pointer to the embedded decNumber
+	dn *C.decNumber // Pointer to the embedded decNumber
 }
 
-func newNumber(digits int32) *Number {
+// newNumber creates an uninitialized number with enough storage space to hold nDigits digits.
+func newNumber(nDigits int32) *Number {
 	num := &Number{}
 	// required structure size do hold the requested amount of digits
-	dnSize := _sz_decNumber + (C.size_t(digits)+_DPUN-1)/_DPUN*_sz_Unit
-	num.n = (*C.decNumber)(C.malloc(dnSize))
-	if num.n == nil {
+	dnSize := _sz_decNumber + (C.size_t(nDigits)+_DPUN-1)/_DPUN*_sz_Unit
+	num.dn = (*C.decNumber)(C.malloc(dnSize))
+	if num.dn == nil {
 		panic("Malloc failed")
 	}
 	runtime.SetFinalizer(num, (*Number).finalize)
-	C.decNumberZero(num.n)
+	// C.decNumberZero(num.n)
 	return num
 }
 
 func (n *Number) finalize() {
-	C.free(unsafe.Pointer(n.n))
-	n.n = nil
+	C.free(unsafe.Pointer(n.dn))
+	n.dn = nil
 }
 
 // Zero sets the value of a Number to zero.
 func (n *Number) Zero() *Number {
-	// C.decNumberZero(n.n)
+	// C.decNumberZero(n.dn)
 	// Reimplemented in Go for speed
-	dn := n.n
+	dn := n.dn
 	dn.bits = 0
 	dn.exponent = 0
 	dn.digits = 1
@@ -71,13 +72,17 @@ func (n *Number) Zero() *Number {
 // an exponent is needed (that is, there will be just one digit before any decimal point). It implements the
 // to-scientific-string conversion.
 func (n *Number) String() string {
-	str := (*C.char)(C.malloc(C.DECNUMDIGITS + 14))
+	nDigits := C.size_t(n.dn.digits)
+	if nDigits == 0 {
+		nDigits++
+	}
+	str := (*C.char)(C.malloc(nDigits + 14))
 	if str == nil {
 		panic("Malloc failed")
 	}
 	defer C.free(unsafe.Pointer(str))
 
-	C.decNumberToString(n.n, str)
+	C.decNumberToString(n.dn, str)
 	return C.GoString(str)
 }
 
@@ -99,19 +104,12 @@ func (c *Context) NewNumber() *Number {
 // The length of the coefficient and the size of the exponent are checked by this routine, so the
 // correct error (Underflow or Overflow) can be reported or rounding applied, as necessary. If bad
 // syntax is detected, the result will be a quiet NaN.
-//
-// An non-nil error is returned only if an error occured during this operation, regardless of
-// the previous Context status. i.e. there is no need to clear the status beforehand.
-func (c *Context) NewNumberFromString(s string) (n *Number, err error) {
+func (c *Context) NewNumberFromString(s string) *Number {
 	str := C.CString(s)
 	defer C.free(unsafe.Pointer(str))
-	oldStatus := c.Status().Save(Errors) // keep a backup of previous errors on this context
-	c.Status().Clear(Errors)             // and clear them
-	n = c.NewNumber()
-	C.decNumberFromString(n.n, str, &c.ctx)
-	err = c.Status().ToError()
-	c.Status().Set(*oldStatus) // Merge back the old status
-	return
+	n := c.NewNumber()
+	C.decNumberFromString(n.dn, str, &c.ctx)
+	return n
 }
 
 // FreeNumber declares a Number as free for reuse and puts it back on the free list.
@@ -122,4 +120,74 @@ func (c *Context) NewNumberFromString(s string) (n *Number, err error) {
 func (c *Context) FreeNumber(n *Number) {
 	// zero it before pushing it back
 	c.fn.Put(n.Zero())
+}
+
+//
+// Arithmetic functions
+//
+
+// NumberAdd adds two numbers. Computes res = lhs + rhs.
+//
+// res may be lhs and/or rhs (e.g., X=X+X)
+//
+// Returns res
+func (c *Context) NumberAdd(res *Number, lhs *Number, rhs *Number) *Number {
+	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, &c.ctx)
+	return res
+}
+
+// NumberMultiply multiplies one number by another. Computes res = lhs * rhs.
+//
+// res may be lhs and/or rhs (e.g., X=X*X)
+//
+// Returns res
+func (c *Context) NumberMultiply(res *Number, lhs *Number, rhs *Number) *Number {
+	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, &c.ctx)
+	return res
+}
+
+// NumberDivide divides one number by another. Computes res = lhs / rhs.
+//
+// res may be lhs and/or rhs (e.g., X=X/X)
+//
+// Returns res
+func (c *Context) NumberDivide(res *Number, lhs *Number, rhs *Number) *Number {
+	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, &c.ctx)
+	return res
+}
+
+// NumberPower raises a number to a power. Computes res = lhs ** rhs (lhs raised to the power of rhs).
+//
+// res may be lhs and/or rhs (e.g., X=X**X)
+//
+// Mathematical function restrictions apply; a NaN is
+// returned with Invalidoperation if a restriction is violated.
+//
+// However, if 1999999997 <= rhs <= 999999999 and rhs is an integer then the
+// restrictions on lhs and the context are relaxed to the usual bounds,
+// for compatibility with the earlier (integer power only) version
+// of this function.
+//
+// When rhs is an integer, the result may be exact, even if rounded.
+//
+// The final result is rounded according to the context; it will
+// almost always be correctly rounded, but may be up to 1 ulp in
+// error in rare cases.
+//
+// Returns res
+func (c *Context) NumberPower(res *Number, lhs *Number, rhs *Number) *Number {
+	C.decNumberPower(res.dn, lhs.dn, rhs.dn, &c.ctx)
+	return res
+}
+
+// NumberRescale forces exponent to a requested value. Computes res = op(lhs,rhs) where op adjusts the
+// coefficient of res (by rounding or shifting) such that the exponent (-scale) of res has the value rhs.
+// The numerical value of res will equal lhs, except for the effects of any rounding that occurred.
+//
+// res may be lhs or rhs.
+//
+// Returns res
+func (c *Context) NumberRescale(res *Number, lhs *Number, rhs *Number) *Number {
+	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, &c.ctx)
+	return res
 }

@@ -40,8 +40,8 @@ func TestContext_FreeNumber(t *testing.T) {
 
 func TestNumber_String(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
-	n, err := ctx.NewNumberFromString("1.27")
-	if err != nil {
+	n := ctx.NewNumberFromString("1.27")
+	if err := ctx.ErrorStatus(); err != nil {
 		t.Fatal(err)
 	}
 	if s := n.String(); s != "1.27" {
@@ -51,8 +51,8 @@ func TestNumber_String(t *testing.T) {
 
 func TestNumber_Zero(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128)
-	n, err := ctx.NewNumberFromString("1.27")
-	if err != nil {
+	n := ctx.NewNumberFromString("1.27")
+	if err := ctx.ErrorStatus(); err != nil {
 		t.Fatal(err)
 	}
 	s := n.Zero().String()

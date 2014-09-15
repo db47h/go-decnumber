@@ -2,6 +2,9 @@
 
 go-decnumber is a go wrapper package around the [libDecnumber library][lib].
 
+This is a work in progress. The API is in a more or less final state, all the decContext functions
+have been implemented, but most decNumber functions are still missing, and there is no decQuad implementation yet.
+
 [lib]: http://speleotrove.com/decimal/decnumber.html
 
 # Implementation details
@@ -35,8 +38,6 @@ to check which functions can be inlined.
 The decNumber module can be built to use fixed precision numbers or arbitrary precision (changeable at runtime), or a mix of both. In order to make things easier and more flexible for the clients of the package, the decNumber module is setup for arbitrary precision numbers.
 
 The precision is held in a decContext structure and numbers are held in a decNumber structure. The caveat is that when dealing with arbitrary precision, the decNumber structures do not keep track of how many digits they can hold. It's up to the programmer to keep track of which decNumber structure was created to be used in a given context.
-
-TODO: now that I think of it, adding the max size of a Number to the structure (an int32) might not be too much overhead: a (decimal128 is already 34 bytes). But would it help improve the API except for foolproof checks in FreeNumber()?
 
 A concrete example, the function Exp() is defined like this:
 
@@ -118,7 +119,8 @@ In the early days of the package, running tests using the Go->C wrappers (for on
 
 # TODO
 
-- Implement basic math functions
+- CreateNewCustomContext() is just plain ugly. Implement SetDigits() and re-create the free-list in it. But Need to add a pointer to the freelist as a member of Number (pointer needs to be cleared when puting it back, avoid circular deps).
+- Implement basic math functions.
 
 # Licensing
 

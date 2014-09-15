@@ -115,8 +115,7 @@ func (s *Status) Test(mask Status) bool {
 }
 
 // Save saves bits in current status. mask indicates the bits to be saved (the status bits that
-// correspond to each 1 bit in the mask are saved). See the implementation of
-// Context.NewNumberFromString() for a typical use of Save().
+// correspond to each 1 bit in the mask are saved).
 //
 // Returns a *Status that represents the AND of the mask and the current status.
 func (s *Status) Save(mask Status) *Status {
