@@ -38,15 +38,22 @@ type Number struct {
 	ctx *Context     // Context that created this number
 }
 
-// newNumber creates an uninitialized number with enough storage space to hold nDigits digits.
-func newNumber(nDigits int32) *Number {
+// NewNumber returns, as a *Number, a new uinitialized Number suitable for use in the given Context.
+// i.e. with enough storage space to hold the context's required number of digits. If memory cannot
+// be allocated for the new number, the function will panic.
+//
+// Since the Number is unitialized, its value is not valid and must be initialized from some source
+// before using it as an operand in an arithmetic operation. This is not necessary if the Number is
+// to be used as the result of such operation.
+func NewNumber(ctx *Context) *Number {
 	num := &Number{}
 	// required structure size do hold the requested amount of digits
-	dnSize := _sz_decNumber + (C.size_t(nDigits)+_DPUN-1)/_DPUN*_sz_Unit
+	dnSize := _sz_decNumber + (C.size_t(ctx.Digits())+_DPUN-1)/_DPUN*_sz_Unit
 	num.dn = (*C.decNumber)(C.malloc(dnSize))
 	if num.dn == nil {
 		panic("Malloc failed")
 	}
+	num.ctx = ctx
 	runtime.SetFinalizer(num, (*Number).finalize)
 	return num
 }
@@ -55,18 +62,6 @@ func (n *Number) finalize() {
 	C.free(unsafe.Pointer(n.dn))
 	n.dn = nil
 	n.ctx = nil
-}
-
-// BindToContext binds Number n to Context c. Used by Context when created new numbers.
-func (n *Number) BindToContext(c *Context) {
-	n.ctx = c
-}
-
-// Release declares a Number as free for reuse and puts it back on the free list.
-func (n *Number) Release() {
-	if n.ctx != nil {
-		n.ctx.ReleaseNumber(n)
-	}
 }
 
 // Zero sets the value of a Number to zero.
@@ -111,6 +106,39 @@ func (n *Number) FromString(s string) *Number {
 	C.decNumberFromString(n.dn, str, n.ctx.DecContext())
 	return n
 }
+
+//
+// Pooling facilities
+//
+
+// A NumberPooler represents an object that can be used as a generic pool. sync.Pool and
+// decnumber.Pool implement this interface.
+type Pooler interface {
+	Get() interface{}
+	Put(interface{})
+}
+
+// a numberPool wraps a Pooler to automatically type cast the result of Get() to a *Number.
+type numberPool struct {
+	Pooler
+}
+
+// NumberPool creates a wrapper around the given Pooler that will type cast the result of Get() to a
+// *Number.
+func NumberPool(p Pooler) *numberPool {
+	return &numberPool{p}
+}
+
+// Get returns a free *Number from the pool
+func (p *numberPool) Get() *Number {
+	return p.Pooler.Get().(*Number)
+}
+
+// Put returns a *Number to the pool
+// Not implemented. Uses promoted Pooler.Put()
+// func (p *numberPool) Put(n *Number) {
+//	p.Pooler.Put(n)
+// }
 
 //
 // Arithmetic functions

@@ -7,40 +7,11 @@ package decnumber_test
 import (
 	dec "."
 	"testing"
-	"unsafe"
 )
-
-func TestNumber_Release(t *testing.T) {
-	ctx := dec.NewContext(dec.InitDecimal128, 0)
-	n := ctx.NewNumber()
-	p := ctx.NewNumber()
-	n.Release()
-	// Just make sure we get the same pointer
-	if unsafe.Pointer(p) == unsafe.Pointer(n) {
-		t.Fatalf("subsequent calls to NemNumber() yield same object")
-	}
-	q := ctx.NewNumber()
-	if unsafe.Pointer(q) != unsafe.Pointer(n) {
-		t.Fatalf("pointer mismatch")
-	}
-
-	// test freelist capacity. Will hang if not properly implemented
-	t.Log("Testing Context freelist. Will hang if buggy...")
-	dec.FreeListSize = 4
-	ctx = dec.NewContext(dec.InitDecimal32, 0)
-	nums := make(chan *dec.Number, 10)
-	for i := 0; i < 10; i++ {
-		nums <- ctx.NewNumber()
-	}
-	for i := 0; i < 10; i++ {
-		(<-nums).Release()
-	}
-	t.Log("Context freelist OK")
-}
 
 func TestNumber_String(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
-	n := ctx.NewNumber().FromString("1.27")
+	n := dec.NewNumber(ctx).FromString("1.27")
 	if err := ctx.ErrorStatus(); err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +22,7 @@ func TestNumber_String(t *testing.T) {
 
 func TestNumber_Zero(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
-	n := ctx.NewNumber().FromString("1.27")
+	n := dec.NewNumber(ctx).FromString("1.27")
 	if err := ctx.ErrorStatus(); err != nil {
 		t.Fatal(err)
 	}

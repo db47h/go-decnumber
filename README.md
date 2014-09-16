@@ -8,6 +8,7 @@ implementation yet.
 
 [lib]: http://speleotrove.com/decimal/decnumber.html
 
+
 # Implementation details
 
 The decNumber package is split into modules: the decContext module (required), the decNumber module
@@ -83,34 +84,46 @@ implementation. I also tried to make the API as Go-like as I could:
 - Contexts are created with a immutable precision (i.e. number of digits). If one needs to change
   precision on the fly, discard the existing context and create a new one with the required precision.
 - Numbers are created by a method of Context.
-- From a programming standpoint, any Number is a valid number as an operand in arithmetic
-  operations, regardless of the settings or existence of its creator Context (not to be confused
-  with having a valid value in a given arithmetic operation).
+- From a programming standpoint, any Number is a valid operand in arithmetic operations, regardless
+  of the settings or existence of its creator Context (not to be confused with having a valid value
+  in a given arithmetic operation).
 - Numbers hold a pointer to the Context that created them.
-- Contexts hold a free list of Numbers. When a Number is free for re-use, it should be released.
-  This gives the following idiomatic code for temporary Number creation:
-
-	num := context.NewNumber()
-	defer num.Release()
-
-- Release() takes care of breaking circular references (Number->Context->FreeList->Number) by
-  setting the context pointer to nil before release.
-- Releasing numbers is not mandatory. The Release() method only returns it to the free list. When a
-  Number is not returned to the free-list and goes out of scope, it will be handled normally by the
-  garbage collector and any allocated memory freed via an internal SetFinalizer() call.
-- Numbers must not be used by the caller after calling Release() (hence the idiomatic use of defer
-  for this).
 - Arithmetic functions are Number methods. The value of the receiver of the method will be set to
   the result of the operation. For example:
-		
+
 	n.Add(x, y) // n = x + y
 
 - Arithmetic methods always return the receiver in order to allow chain calling:
 
 	n.Add(x, y).Multiply(n, z) // n = (x + y) * z
 
-- Using the same number as operand and result, like in `n.Multiply(n, n)`, is legal and will not
+- Using the same Number as operand and result, like in `n.Multiply(n, n)`, is legal and will not
   produce unexpected results.
+
+## free-list of Numbers
+
+The package provides facilities for managing free-lists of numbers in order to relieve pressure on
+the garbage collector in computation intensive applications. This is in fact a simple wrapper around
+`sync.Pool`, or the lightweight `decnumber.Pool`, which will automatically cast the return value of
+`Get()` to the desired type.
+
+For example:
+
+	ctx := decnumber.NewContext(decnumber.InitDecimal128, 0)
+	pool := decnumber.NumberPool(&sync.Pool{
+		New: func() interface{} { return decnumber.NewNumber(ctx) },
+	})
+	number := pool.Get()    // with no need to type cast to *Number
+	defer pool.Put(number)  // idiomatic code for short lived numbers
+
+The provided `decnumber.Pool` implementation is not thread safe and is only provided as a
+lightweight alternative to sync.Pool.
+
+Note that for pooled numbers, and numbers with a pending deferred `Put()`, there is a dependency
+Pool -> Number -> Context, in this order. This means that if an application needs to change its
+arithmetic precision on the fly, any Pool built on top of the affected Context's will need to be
+discarded and recreated along with the Context. This will not affect existing numbers that can still
+be used as valid operands in arithmetic functions.
 
 ## example use
 
@@ -124,33 +137,43 @@ For all arithmetic computations, temporary numbers, etc., we use the idiomatic d
 Release(). When computing the addition of the top two number, the
 
 	X, Y = := globalStack.Pop2()               // pop top 2 numbers off the stack
-	result := globalCtx.NewNumber().Add(X, Y)  
-	X.Release()                                // send X and Y back to their creator
-	Y.Release()	
+	result := globalPool.Get().Add(X, Y)
+	globalPool.Put(X)                          // send X and Y back to their creator
+	globalPool.Put(Y)
 	globalStack.Push(result)                   // push the result on top of the stack
 
-When the user requests a change in precision, the global context is replaced by a newly created one
-with the requested precision. Numbers present on the stack are kept as is since they are still valid
-Numbers when used as operands in arithmetic functions. New operations will be performed using the
-new context precision since we make sure that every operation is done with a freshly created Number
-for its result.
-
+When the user requests a change in precision, the global Context is replaced by a newly created one
+with the requested precision and the global Pool is replaced by a new one built on top of the new
+Context.  Numbers present on the stack are kept as-is since they are still valid Numbers when used
+as operands in arithmetic functions. New operations will be performed using the new context
+precision since we make sure that every operation is done with a freshly created Number for its
+result.
 
 ## Threading, goroutines
 
-The decNumber package is thread safe as long as threads do not share decContext or decNumber structures. The same goes for the Go wrapper. Goroutines should have their own context. For Numbers, if you need to share them, share by communicating.
+The decNumber library is thread safe as long as threads do not share decContext or decNumber
+structures. The same rule applies to the Go wrapper package. The provided Pool is not thread safe
+either.
+
+A thread safe application could use an immutable global context with a sync.Pool to manage Number
+allocation, and share Number's between goroutines by communicating.
 
 ## What about decDouble, decQuad ?
 
-Right now, go-decnumber only supports decNumber. Adding support for any of the *float* modules would require:
+Right now, go-decnumber only supports decNumber. Adding support for any of the *float* modules would
+require:
 
 - Adding the relevant type in the decnumber module
 - Adding the relevant methods to the Context type
-- A free list is less necessary for the float types since their size is static (128 bits), unlike Number which has a variable size (depending on the Context's precision) and require malloc/feee calls. Quads that are not used outside of a function body should be allocated on the stack (to be tested).
+- Free list management is less necessary for the float types since their size is static (128 bits
+  for Quad), unlike Number which has a variable size (depending on the Context's precision) and
+require malloc/feee calls. Given their small size, Quad's that are not used outside of a function's
+body should be allocated on the stack (to be tested).
 
-Another thing to consider is that for the float types, the Context is used only for error checking and rounding mode. Defining a Context interface with a Number and Quad implementation could also be a good idea.
 
 # Building / Installing
+
+## go get
 
 If you only intend to include this package in your own project, just run
 
@@ -158,7 +181,12 @@ If you only intend to include this package in your own project, just run
 
 and you're all set.
 
-Another option for package maintainers is to use the [.syso mechanism][syso] which greatly speeds up the build process. The idea is to bundle together all the .o files into a single .syso file. When such a file is present in a package folder, it will automatically be linked with the other object files.
+## .syso technique
+
+Another option for package maintainers is to use the [.syso mechanism][syso] which greatly speeds up
+the build process. The idea is to bundle together all the .o files into a single .syso file. When
+such a file is present in a package folder, it will automatically be linked with the other object
+files.
 
 To make the .syso file:
 
@@ -171,7 +199,10 @@ And benefit:
 	go test -tags="syso" -i ./...
 	go test -tags="syso "./...
 
-When the `syso` tag is specified in a Go build, the wrapper files (decContext.go and decNumber.go) are ignored and the build uses the precompiled object file libdecnumber_${GOOS}_${GOARCH}.syso. The difference with a static library is that we do not have to use a ``#cgo LDFLAGS` directive that would bring in the static library in client projects as well.
+When the `syso` tag is specified in a Go build, the wrapper files (decContext.go and decNumber.go)
+are ignored and the build uses the precompiled object file libdecnumber_${GOOS}_${GOARCH}.syso. The
+difference with a static library is that we do not have to use a `#cgo LDFLAGS` directive that would
+bring in the static library in client projects as well.
 
 The top level Makefile (at the root of the package folder) has the following targets:
 
@@ -180,18 +211,22 @@ The top level Makefile (at the root of the package folder) has the following tar
 	make test       # test using the syso file, compiling it if necessary
 	make clean      # the usual + removes the syso file.
 
-In the early days of the package, running tests using the Go->C wrappers (for only 2 C files) took 3 seconds on my workstation, versus only 1 second when using the syso mechanism. 
+In the early days of the package, running tests using the Go->C wrappers (for only 2 C files) took 3
+seconds on my workstation, versus only 1 second when using the syso mechanism.
 
 [syso]: https://code.google.com/p/go-wiki/wiki/GcToolchainTricks#Use_syso_file_to_embed_arbitrary_self-contained_C_code
+
 
 # TODO
 
 - Implement basic math functions.
+- Thoroughly test free-list management and resource clean-up.
+
 
 # Licensing
 
 	go-decnumber
-	Copyright 2014 Denis Bernard. All rights reserved.
+	Copyright 2014 Denis Bernard (wldsvc at gmail.com). All rights reserved.
 
 Use of this package is governed by a BSD-style license that can be found in the LICENSE file.
 

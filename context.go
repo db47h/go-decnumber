@@ -13,10 +13,6 @@ package decnumber
 */
 import "C"
 
-// FreeListSize holds the default size of the free list of Number pointers for contexts. This
-// is a tunable parameter. Set it to the desired value before creating a Context.
-var FreeListSize uint32 = 128
-
 // Rounding represents the rounding mode used by a given Context.
 type Rounding uint32
 
@@ -91,30 +87,6 @@ const (
 	MaxMath   = 999999
 )
 
-// free list of numbers
-type freeNumberList struct {
-	digits int32 // number of digits. Needed to create new numbers of the proper size
-	ch     chan *Number
-}
-
-// Get a *Number from the list or create a new one
-func (l *freeNumberList) Get() *Number {
-	select {
-	case n := <-l.ch:
-		return n
-	default:
-	}
-	return newNumber(l.digits)
-}
-
-// Put back a *Number in the free list
-func (l *freeNumberList) Put(n *Number) {
-	select {
-	case l.ch <- n:
-	default:
-	}
-}
-
 // A Context wraps a decNumber context, the data structure used for providing the context
 // for operations and for managing exceptional conditions.
 //
@@ -124,7 +96,6 @@ func (l *freeNumberList) Put(n *Number) {
 // order to allow inlining and improve performance.
 type Context struct {
 	ctx C.decContext
-	fn  *freeNumberList
 }
 
 // NewContext creates a new context of the requested kind.
@@ -155,7 +126,6 @@ func NewContext(kind ContextKind, digits int32) (pContext *Context) {
 	if digits != 0 {
 		pContext.ctx.digits = C.int32_t(digits)
 	}
-	pContext.fn = &freeNumberList{int32(pContext.ctx.digits), make(chan *Number, FreeListSize)}
 	return
 }
 
@@ -271,22 +241,4 @@ func (c *Context) ErrorStatus() error {
 func (c *Context) ZeroStatus() *Context {
 	c.ctx.status = 0
 	return c
-}
-
-// NewNumber returns, as a *Number, a new zero-initialized Number suitable for use in the given
-// context. i.e. with enough storage space to hold the context's required number of digits. If
-// memory cannot be allocated for the new number, the function will panic. Numbers are managed
-// in a free list. Once a program is done with a number, it should release it by calling
-// Release()
-func (c *Context) NewNumber() (n *Number) {
-	n = c.fn.Get().Zero()
-	n.BindToContext(c)
-	return
-}
-
-// ReleaseNumber declares a Number as free for reuse and puts it back on the free list.
-// For internal use. Use Number.Release() instead.
-func (c *Context) ReleaseNumber(n *Number) {
-	n.BindToContext(nil) // break cyclic reference
-	c.fn.Put(n)
 }
