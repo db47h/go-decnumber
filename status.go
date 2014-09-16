@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package decnumber
+package dec
 
 /*
 #include "go-decnumber.h"
@@ -138,7 +138,7 @@ func (s *Status) Restore(newStatus Status, mask Status) *Status {
 
 // Func ToError() checks the status for any error condition and returns, as an error,
 // a ContextError if any, nil otherwise.
-// Convert the return value with err.(decnumber.ContextError) to compare it
+// Convert the return value with err.(dec.ContextError) to compare it
 // against any of the Status values.
 //
 // Status bits considered errors are:

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package decnumber
+package dec
 
 /*
 #include "go-decnumber.h"
@@ -10,21 +10,16 @@ package decnumber
 #include <stdlib.h>
 
 // Helpers for go code
-#define sz_Unit sizeof(decNumberUnit)
-// size of a decNumber with 0 digits
-#define sz_decNumber (sizeof(decNumber)-DECNUMUNITS*sizeof(decNumberUnit))
+decNumber * new_decNumber(int32_t digits) {
+	return malloc( (sizeof(decNumber)-DECNUMUNITS*sizeof(decNumberUnit))
+				+ ((size_t)digits+DECDPUN-1) / DECDPUN * sizeof(decNumberUnit) );
+}
 */
 import "C"
 
 import (
 	"runtime"
 	"unsafe"
-)
-
-const (
-	_DPUN         = C.size_t(C.DECDPUN)
-	_sz_Unit      = C.size_t(C.sz_Unit)
-	_sz_decNumber = C.size_t(C.sz_decNumber)
 )
 
 // A Number reprsents a number optimized for efficient processing of relatively short numbers (tens or
@@ -34,8 +29,7 @@ const (
 //
 // Numbers should be created via the NewNumber() function.
 type Number struct {
-	dn  *C.decNumber // Pointer to the embedded decNumber
-	ctx *Context     // Context that created this number
+	dn *C.decNumber // Pointer to the embedded decNumber
 }
 
 // NewNumber returns, as a *Number, a new uinitialized Number suitable for use in the given Context.
@@ -48,20 +42,19 @@ type Number struct {
 func NewNumber(ctx *Context) *Number {
 	num := &Number{}
 	// required structure size do hold the requested amount of digits
-	dnSize := _sz_decNumber + (C.size_t(ctx.Digits())+_DPUN-1)/_DPUN*_sz_Unit
-	num.dn = (*C.decNumber)(C.malloc(dnSize))
+	num.dn = C.new_decNumber(C.int32_t(ctx.Digits()))
 	if num.dn == nil {
 		panic("Malloc failed")
 	}
-	num.ctx = ctx
 	runtime.SetFinalizer(num, (*Number).finalize)
 	return num
 }
 
 func (n *Number) finalize() {
-	C.free(unsafe.Pointer(n.dn))
-	n.dn = nil
-	n.ctx = nil
+	if n.dn != nil {
+		C.free(unsafe.Pointer(n.dn))
+		n.dn = nil
+	}
 }
 
 // Zero sets the value of a Number to zero.
@@ -69,9 +62,9 @@ func (n *Number) Zero() *Number {
 	// C.decNumberZero(n.dn)
 	// Reimplemented in Go for speed
 	dn := n.dn
-	dn.bits = 0
-	dn.exponent = 0
 	dn.digits = 1
+	dn.exponent = 0
+	dn.bits = 0
 	dn.lsu[0] = 0
 	return n
 }
@@ -100,10 +93,10 @@ func (n *Number) String() string {
 // The length of the coefficient and the size of the exponent are checked by this routine, so the
 // correct error (Underflow or Overflow) can be reported or rounding applied, as necessary. If bad
 // syntax is detected, the result will be a quiet NaN.
-func (n *Number) FromString(s string) *Number {
+func (n *Number) FromString(s string, ctx *Context) *Number {
 	str := C.CString(s)
 	defer C.free(unsafe.Pointer(str))
-	C.decNumberFromString(n.dn, str, n.ctx.DecContext())
+	C.decNumberFromString(n.dn, str, ctx.DecContext())
 	return n
 }
 
@@ -112,25 +105,22 @@ func (n *Number) FromString(s string) *Number {
 //
 
 // A NumberPooler represents an object that can be used as a generic pool. sync.Pool and
-// decnumber.Pool implement this interface.
+// dec.Pool implement this interface.
 type Pooler interface {
 	Get() interface{}
 	Put(interface{})
 }
 
-// a numberPool wraps a Pooler to automatically type cast the result of Get() to a *Number.
-type numberPool struct {
+// A NumberPool wraps a Pooler to automatically type cast the result of Get() to a *Number.
+// The *Context field is a convenience field to help in keeping track of the pool and associated
+// Context with a single reference.
+type NumberPool struct {
 	Pooler
-}
-
-// NumberPool creates a wrapper around the given Pooler that will type cast the result of Get() to a
-// *Number.
-func NumberPool(p Pooler) *numberPool {
-	return &numberPool{p}
+	*Context
 }
 
 // Get returns a free *Number from the pool
-func (p *numberPool) Get() *Number {
+func (p *NumberPool) Get() *Number {
 	return p.Pooler.Get().(*Number)
 }
 
@@ -147,24 +137,24 @@ func (p *numberPool) Get() *Number {
 // NumberAdd adds two numbers. Computes res = lhs + rhs.
 //
 // Returns res
-func (res *Number) Add(lhs *Number, rhs *Number) *Number {
-	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+func (res *Number) Add(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
 }
 
 // NumberMultiply multiplies one number by another. Computes res = lhs * rhs.
 //
 // Returns res
-func (res *Number) Multiply(lhs *Number, rhs *Number) *Number {
-	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+func (res *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
 }
 
 // NumberDivide divides one number by another. Computes res = lhs / rhs.
 //
 // Returns res
-func (res *Number) Divide(lhs *Number, rhs *Number) *Number {
-	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+func (res *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
 }
 
@@ -185,8 +175,8 @@ func (res *Number) Divide(lhs *Number, rhs *Number) *Number {
 // error in rare cases.
 //
 // Returns res
-func (res *Number) Power(lhs *Number, rhs *Number) *Number {
-	C.decNumberPower(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+func (res *Number) Power(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberPower(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
 }
 
@@ -195,7 +185,7 @@ func (res *Number) Power(lhs *Number, rhs *Number) *Number {
 // The numerical value of res will equal lhs, except for the effects of any rounding that occurred.
 //
 // Returns res
-func (res *Number) Rescale(lhs *Number, rhs *Number) *Number {
-	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, res.ctx.DecContext())
+func (res *Number) Rescale(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
 }

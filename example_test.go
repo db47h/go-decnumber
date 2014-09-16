@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package decnumber_test
+package dec_test
 
 import (
 	"."
@@ -17,10 +17,10 @@ func Example_example1() {
 	arg1 := "1.27"
 	arg2 := "2.23"
 
-	ctx := decnumber.NewContext(decnumber.InitBase, 34)
+	ctx := dec.NewContext(dec.InitBase, 34)
 
-	a := decnumber.NewNumber(ctx).FromString(arg1) // Should not ignore errors...
-	b := decnumber.NewNumber(ctx).FromString(arg2)
+	a := dec.NewNumber(ctx).FromString(arg1, ctx) // Should not ignore errors...
+	b := dec.NewNumber(ctx).FromString(arg2, ctx)
 
 	// Not in the original example: error checking.
 	// If an error occured while converting either a or b, err will be set to a non nil value
@@ -29,7 +29,7 @@ func Example_example1() {
 		return
 	}
 
-	a.Add(a, b) // a=a+b
+	a.Add(a, b, ctx) // a=a+b
 
 	// there is no need to call c.String(). fmt.Print("%s") takes care of it.
 	fmt.Printf("%s + %s => %s\n", arg1, arg2, a)
@@ -38,81 +38,17 @@ func Example_example1() {
 	// 1.27 + 2.23 => 3.50
 }
 
-// Go re-implementation of decNumber's example2.c.
-//
-// Calculate compound interest.
-// Arguments are investment, rate (%), and years
-func Example_example2() {
-	// While the original example was a kinda standalone demo, we turned this example
-	// into what a real CompundInterest() function would look like. Real function prototype:
-	//
-	// func CompoundInterest(total *Number, start *Number, rate *Number, years *Number) error
-	//
-	// Simulate arguments passed to the function
-	var (
-		// The context and pool are usually global objects (or per goroutine)
-		// A function-local pool would be almost pointless
-		ctx   = decnumber.NewContext(decnumber.InitBase, 25)
-		nlist = decnumber.NumberPool(&decnumber.Pool{
-			New: func() interface{} { return decnumber.NewNumber(ctx) },
-		})
-		total = nlist.Get()
-		start = nlist.Get().FromString("50000")
-		rate  = nlist.Get().FromString("3.17")
-		years = nlist.Get().FromString("12")
-	)
-
-	// Real function start:
-	var (
-		one     = nlist.Get().FromString("1")
-		mTwo    = nlist.Get().FromString("-2")
-		hundred = nlist.Get().FromString("100")
-	)
-	defer func() {
-		nlist.Put(one)
-		nlist.Put(mTwo)
-		nlist.Put(hundred)
-	}()
-	// The above constants should really be taken from a const library
-
-	// save status and clear
-	saved := ctx.Status().Save(decnumber.Errors)
-	ctx.Status().Clear(decnumber.Errors)
-
-	// Compute
-	t := nlist.Get()           // get a temporary number t
-	defer nlist.Put(t)         // put back t when we're done with it
-	t.Divide(rate, hundred)    // t=rate/100
-	t.Add(t, one)              // t=t+1
-	t.Power(t, years)          // t=t**years
-	total.Multiply(t, start)   // total=t*start
-	total.Rescale(total, mTwo) // two digits please
-
-	// Function epilogue:
-	_ = /* err := */ ctx.ErrorStatus() // check errors
-	// Merge previous status
-	ctx.Status().Set(*saved)
-
-	fmt.Printf("%s at %s%% for %s years => %s\n",
-		start, rate, years, total)
-
-	// return err
-
-	// Output:
-	// 50000 at 3.17% for 12 years => 72712.85
-}
-
 // NewNumber() example
 func Example_NewNumber() {
 	// create a context with 99 digits precision, just for kicks
-	ctx := decnumber.NewContext(decnumber.InitBase, 99)
+	ctx := dec.NewContext(dec.InitBase, 99)
 	// create a number
-	n := decnumber.NewNumber(ctx)
+	n := dec.NewNumber(ctx)
 
 	// an IEEE 754 decimal128 type context
 	// using the default 34 digits precision
-	ctx = decnumber.NewContext(decnumber.InitDecimal128, 0)
-	n = decnumber.NewNumber(ctx)
+	ctx = dec.NewContext(dec.InitDecimal128, 0)
+	n = dec.NewNumber(ctx)
 	// Set it to zero
 	n.Zero()
 	fmt.Println(n)
@@ -124,10 +60,10 @@ func Example_NewNumber() {
 // Accpeted formats and error handling demo.
 func ExampleNumber_FromString() {
 	// new context
-	ctx := decnumber.NewContext(decnumber.InitDecimal64, 0)
+	ctx := dec.NewContext(dec.InitDecimal64, 0)
 	// We're lazy, and since we can do it, define a shorthand
-	New := func(s string) *decnumber.Number {
-		return decnumber.NewNumber(ctx).FromString(s)
+	New := func(s string) *dec.Number {
+		return dec.NewNumber(ctx).FromString(s, ctx)
 	}
 
 	n := New("378.2654651646516165416165315131232")
@@ -183,53 +119,57 @@ func ExampleNumber_FromString() {
 // Example use of a pool to manage a free list of numbers
 func ExampleNumberPool_1() {
 	// Create a Context
-	ctx := decnumber.NewContext(decnumber.InitDecimal128, 0)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 
 	// New() function for the pool to create new numbers
-	newFunc := func() interface{} { return decnumber.NewNumber(ctx) }
+	newFunc := func() interface{} { return dec.NewNumber(ctx) }
 
-	// create a pool. Either decnumber.Pool or sync.Pool will do
+	// create a pool. Either dec.Pool or sync.Pool will do
 	syncPool := sync.Pool{New: newFunc}
 
-	// We can use Get().(*decnumber.Number) to get new or reusable numbers
-	number := syncPool.Get().(*decnumber.Number)
+	// We can use Get().(*dec.Number) to get new or reusable numbers
+	number := syncPool.Get().(*dec.Number)
 	fmt.Printf("from sync.Pool: %s\n", number.Zero())
 	// We're done with it, put it back in the pool
 	syncPool.Put(number)
 
-	// Or, wrap it with NumberPool() so that Get() returns *Number instead of interface{}
-	pool := decnumber.NumberPool(&syncPool)
+	// Or, wrap it with a NumberPool so that Get() returns *Number instead of interface{}.
+	// NumberPool also helps keeping track of the context.
+	pool := &dec.NumberPool{&syncPool, ctx}
 	// and benefit: no need to type-cast
 	number = pool.Get()
 	// Introducing the idiomatic code: defer Put() the *Number right after Get()
 	defer pool.Put(number)
-	fmt.Printf("from sync.Pool: %s\n", number.FromString("1243"))
+	fmt.Printf("from sync.Pool: %s\n", number.FromString("1243", pool.Context))
 
 	// Output:
 	// from sync.Pool: 0
 	// from sync.Pool: 1243
 }
 
-// Compact version of example 1, using decnumber.Pool
+// Compact version of example 1, using dec.Pool
 func ExampleNumberPool_2() {
 	// Create a Context
-	ctx := decnumber.NewContext(decnumber.InitDecimal128, 0)
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
 
-	// And a usable pool based on decnumber.Pool
-	pool := decnumber.NumberPool(&decnumber.Pool{
-		New: func() interface{} { return decnumber.NewNumber(ctx) },
-	})
+	// And a usable pool based on dec.Pool
+	pool := &dec.NumberPool{
+		&dec.Pool{
+			New: func() interface{} { return dec.NewNumber(ctx) },
+		},
+		ctx,
+	}
 
 	// Now create numbers
 	number := pool.Get()
 	defer pool.Put(number)
-	fmt.Printf("from decnumber.Pool: %s\n", number.Zero())
+	fmt.Printf("from dec.Pool: %s\n", number.Zero())
 
 	number = pool.Get()
 	defer pool.Put(number)
-	fmt.Printf("from decnumber.Pool: %s\n", number.FromString("1243"))
+	fmt.Printf("from dec.Pool: %s\n", number.FromString("1243", pool.Context))
 
 	// Output:
-	// from decnumber.Pool: 0
-	// from decnumber.Pool: 1243
+	// from dec.Pool: 0
+	// from dec.Pool: 1243
 }

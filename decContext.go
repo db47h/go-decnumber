@@ -6,7 +6,7 @@
 
 /* This file is a wrapper around decContext.c */
 
-package decnumber
+package dec
 
 /*
 // #cgo flags are specified in context.go

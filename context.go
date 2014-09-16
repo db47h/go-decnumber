@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package decnumber
+package dec
 
 /*
 #cgo CFLAGS: -Ilibdecnumber
@@ -90,7 +90,7 @@ const (
 // A Context wraps a decNumber context, the data structure used for providing the context
 // for operations and for managing exceptional conditions.
 //
-// Contexts must be created using the NewContext() or NewCustomContext() functions.
+// Contexts must be created using the NewContext() functions.
 //
 // Most accessor and status manipulation functions (one liners) have be rewriten in pure Go in
 // order to allow inlining and improve performance.
@@ -228,7 +228,7 @@ func (c *Context) Status() *Status {
 
 // Func ErrorStatus() checks the Context status for any error condition
 // and returns, as an error, a ContextError if any, nil otherwise.
-// Convert the return value with err.(decnumber.ContextError) to compare it
+// Convert the return value with err.(dec.ContextError) to compare it
 // against any of the Status values. This is a shorthand for Context.Status().ToError()
 func (c *Context) ErrorStatus() error {
 	return c.Status().ToError()

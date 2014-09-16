@@ -1,6 +1,6 @@
 # Overview
 
-go-decnumber is a go wrapper package around the [libDecnumber library][lib].
+Package dec is a go wrapper package around the [libDecnumber library][lib].
 
 This is a work in progress. The API is in a more or less final state, all the decContext functions
 have been implemented, but most decNumber functions are still missing, and there is no decQuad
@@ -9,7 +9,7 @@ implementation yet.
 [lib]: http://speleotrove.com/decimal/decnumber.html
 
 
-# Implementation details
+# C decNumber to Go
 
 The decNumber package is split into modules: the decContext module (required), the decNumber module
 (for arbitrary precision arithmetic), *float* modules, namely decSingle, decDouble and decQuad, and
@@ -36,7 +36,7 @@ My initial intent was to split the wrapper into modules, in the same way as the 
 this lead to unsolvable compilation issues, like missing references in the Number (Go) module to the
 decContext (C) module. This is currently a no-Go (sorry) without shared libraries. However, I did
 not want to force the end-user of the package to build and install a custom shared library, and I
-also wanted the packege to be `go get`'able. Also considering the design decisions discussed in the
+also wanted the package to be `go get`'able. Also considering the design decisions discussed in the
 next section, I ended up making a monolithic package around decNumber and decContext.
 
 The usual way to link Go code against a static library is to use a `#cgo LDFLAGS:
@@ -58,18 +58,15 @@ performance. Use
 
 to check which functions can be inlined.
 
-## Numbers, Context and precision
+# Numbers, Context and precision
 
 The decNumber module can be built to use fixed precision numbers or arbitrary precision (changeable
 at runtime), or a mix of both. In order to make things easier and more flexible for the clients of
 this package, the decNumber module is setup for arbitrary precision numbers.
 
-The precision is held in a decContext structure and numbers are held in a decNumber structure. The
-caveat is that when dealing with arbitrary precision, the decNumber structures do not keep track of
-how many digits they can hold. It's up to the programmer to keep track of which decNumber structure
-was created to be used in a given context.
-
-A concrete example, the function Exp() is defined like this:
+Most functions take a *context* parameter which provides the context for operations (precision,
+rounding mode, etc.) and also controls the handling of exceptional conditions. For example, the
+Exp() function is defined like this (C version):
 
 	decNumber * decNumberExp(decNumber *res, const decNumber *rhs, decContext *set)
 
@@ -77,79 +74,91 @@ It will set *res* to *e* raised to the power of *rhs*. The *rhs* operand can be 
 (i.e. context independent). However, \**res*, the decNumber structure that will hold the result, has
 to have enough storage space to hold the precision specified in the decContext *set*.
 
-In a top-down functional programming model, this is not a serious issue. However, with goroutines
-flying all over the place, this can get messy. This lead to a few design choices in the go
-implementation. I also tried to make the API as Go-like as I could:
+One of the major problems a programmer may have when working with the decNumber library is keeping
+track of which decNumber was created to work with which decContext (i.e. with enough storage space
+for that context). We tried several approaches to get rid of this context parameter in the Go
+implementation, but with no success. Suggestions welcome!
+
+Note that this is a non-issue for applications using a fixed precision, while applications that
+require dynamic precision can leverage the dec.NumberPool facility to keep track of their working
+context and free Number list with a single variable.
+
+
+# Go implementation details
 
 - Contexts are created with a immutable precision (i.e. number of digits). If one needs to change
   precision on the fly, discard the existing context and create a new one with the required precision.
-- Numbers are created by a method of Context.
-- From a programming standpoint, any Number is a valid operand in arithmetic operations, regardless
-  of the settings or existence of its creator Context (not to be confused with having a valid value
-  in a given arithmetic operation).
-- Numbers hold a pointer to the Context that created them.
+- From a programming standpoint, any initialized Number is a valid operand in arithmetic operations,
+  regardless of the settings or existence of its creator Context (not to be confused with having a
+valid value in a given arithmetic operation).
 - Arithmetic functions are Number methods. The value of the receiver of the method will be set to
   the result of the operation. For example:
 
-	n.Add(x, y) // n = x + y
+	n.Add(x, y, context) // n = x + y
 
 - Arithmetic methods always return the receiver in order to allow chain calling:
 
-	n.Add(x, y).Multiply(n, z) // n = (x + y) * z
+	n.Add(x, y, context).Multiply(n, z, context) // n = (x + y) * z
 
-- Using the same Number as operand and result, like in `n.Multiply(n, n)`, is legal and will not
+- Using the same Number as operand and result, like in `n.Multiply(n, n, ctx)`, is legal and will not
   produce unexpected results.
+
 
 ## Free-list of Numbers
 
-The package provides facilities for managing free-lists of numbers in order to relieve pressure on
-the garbage collector in computation intensive applications. This is in fact a simple wrapper around
-`sync.Pool`, or the lightweight `decnumber.Pool`, which will automatically cast the return value of
-`Get()` to the desired type.
+The package provides facilities for managing free-lists of Numbers in order to relieve pressure on
+the garbage collector in computation intensive applications. NumberPool is in fact a simple wrapper
+around a \*Context and a `sync.Pool`, or the lighter `dec.Pool`, which will automatically cast the
+return value of `Get()` to the desired type.
 
 For example:
 
-	ctx := decnumber.NewContext(decnumber.InitDecimal128, 0)
-	pool := decnumber.NumberPool(&sync.Pool{
-		New: func() interface{} { return decnumber.NewNumber(ctx) },
-	})
-	number := pool.Get()    // with no need to type cast to *Number
-	defer pool.Put(number)  // idiomatic code for short lived numbers
+	ctx := dec.NewContext(dec.InitDecimal128, 0)
+	// idomatic code for NumberPool creation
+	pool := &dec.NumberPool{
+		&sync.Pool{
+			New: func() interface{} { return dec.NewNumber(ctx) },
+		},
+		ctx,                             // same context as the one used in New()
+	}                              
+	number := pool.Get()                 // with no need to type cast to *Number
+	defer pool.Put(number)               // idiomatic code for short lived numbers
+	number.FromString("1243", pool.Context)
 
-The provided `decnumber.Pool` implementation is not thread safe and is only provided as a
+Note the use of `pool.Context` on the last statement.
+
+The provided `dec.Pool` implementation is not thread safe and is only provided as a
 lightweight alternative to sync.Pool.
 
-Note that for pooled numbers, and numbers with a pending deferred `Put()`, there is a dependency
-Pool -> Number -> Context, in this order. This means that if an application needs to change its
-arithmetic precision on the fly, any Pool built on top of the affected Context's will need to be
-discarded and recreated along with the Context. This will not affect existing numbers that can still
-be used as valid operands in arithmetic functions.
+If an application needs to change its arithmetic precision on the fly, any NumberPool built on top
+of the affected Context's will need to be discarded and recreated along with the Context. This will
+not affect existing numbers that can still be used as valid operands in arithmetic functions.
+
 
 ## Example scenario
 
 A concrete usage example of the fixed context precision and free-list management could be a
 calculator application where we have:
 
-- a global Context
-- a global pool managing a free-list of Number's
+- a global NumberPool managing a free-list of Number's and only reference to a global pool.
 - a global stack of numbers (implemented as a slice)
 
 For all arithmetic computations, temporary numbers, etc., we use the idiomatic `number := pool.Get()`
 followed by a deferred call to `pool.Put(number)`. To compute the addition of the top two
 numbers on the stack, we do the following:
 
-	X, Y = := globalStack.Pop2()               // pop top 2 numbers off the stack
-	result := globalPool.Get().Add(X, Y)       // Get a new Number and set it to X+Y
-	globalPool.Put(X)                          // Put X and Y back in the pool
+	X, Y = := globalStack.Pop2()          // pop top 2 numbers off the stack
+	result := globalPool.Get()            // Get a new Number
+	result.Add(X, Y, globalPool.Context)  // and set it to X+Y
+	globalPool.Put(X)                     // Put X and Y back in the pool
 	globalPool.Put(Y)
-	globalStack.Push(result)                   // push the result on top of the stack
+	globalStack.Push(result)              // push the result on top of the stack
 
-When the user requests a change in precision, the global Context is replaced by a newly created one
-with the requested precision and the global Pool is replaced by a new one built on top of the new
-Context.  Numbers present on the stack are kept as-is since they are still valid Numbers when used
-as operands in arithmetic functions. New operations will be performed using the new context
-precision since we make sure that every operation is done with a freshly created Number for its
-result.
+When the user requests a change in precision, we create a new Context setup for the requested
+precision and replace the global NumberPool with a new one referencing this new Context.  Numbers
+present on the stack are kept as-is since they are still valid Numbers when used as operands in
+arithmetic functions. New operations will be performed using the new Context's precision since we
+make sure that every operation is done with a freshly created Number for its result.
 
 ## Threading, goroutines
 
@@ -162,11 +171,10 @@ allocation, and share Number's between goroutines by communicating.
 
 ## What about decDouble, decQuad ?
 
-Right now, go-decnumber only supports decNumber. Adding support for any of the *float* modules would
+Right now, the dec package only supports decNumber. Adding support for any of the *float* modules would
 require:
 
-- Adding the relevant type in the decnumber module
-- Adding the relevant methods to the Context type
+- Adding the relevant type in the dec module
 - Free list management is less necessary for the float types since their size is static (128 bits
   for Quad), unlike Number which has a variable size (depending on the Context's precision) and
 require malloc/feee calls. Given their small size, Quad's that are not used outside of a function's

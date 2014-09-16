@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package decnumber
+package dec
 
 // poolSize is the default maximum size for new pools.
 var poolSize uint = 128
