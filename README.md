@@ -100,7 +100,7 @@ implementation. I also tried to make the API as Go-like as I could:
 - Using the same Number as operand and result, like in `n.Multiply(n, n)`, is legal and will not
   produce unexpected results.
 
-## free-list of Numbers
+## Free-list of Numbers
 
 The package provides facilities for managing free-lists of numbers in order to relieve pressure on
 the garbage collector in computation intensive applications. This is in fact a simple wrapper around
@@ -125,20 +125,22 @@ arithmetic precision on the fly, any Pool built on top of the affected Context's
 discarded and recreated along with the Context. This will not affect existing numbers that can still
 be used as valid operands in arithmetic functions.
 
-## example use
+## Example scenario
 
-A concrete usage example of the fixed context precision and free-lists could be a calculator
-application where we have:
+A concrete usage example of the fixed context precision and free-list management could be a
+calculator application where we have:
 
-- a global context
+- a global Context
+- a global pool managing a free-list of Number's
 - a global stack of numbers (implemented as a slice)
 
-For all arithmetic computations, temporary numbers, etc., we use the idiomatic deferred call to
-Release(). When computing the addition of the top two number, the
+For all arithmetic computations, temporary numbers, etc., we use the idiomatic `number := pool.Get()`
+followed by a deferred call to `pool.Put(number)`. To compute the addition of the top two
+numbers on the stack, we do the following:
 
 	X, Y = := globalStack.Pop2()               // pop top 2 numbers off the stack
-	result := globalPool.Get().Add(X, Y)
-	globalPool.Put(X)                          // send X and Y back to their creator
+	result := globalPool.Get().Add(X, Y)       // Get a new Number and set it to X+Y
+	globalPool.Put(X)                          // Put X and Y back in the pool
 	globalPool.Put(Y)
 	globalStack.Push(result)                   // push the result on top of the stack
 
