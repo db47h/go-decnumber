@@ -239,10 +239,23 @@ seconds on my workstation, versus only 1 second when using the syso mechanism.
 
 # Licensing
 
-	go-decnumber
-	Copyright 2014 Denis Bernard (wldsvc at gmail.com). All rights reserved.
+## go-decnumber (dec package)
+
+The go-decnumber wrapper is:
+
+Copyright 2014 Denis Bernard (wldsvc at gmail.com)
+
+All rights reserved.
 
 Use of this package is governed by a BSD-style license that can be found in the LICENSE file.
 
-The decNumber library is made available under the terms of the ICU License -- ICU 1.8.1 and later,
+## decNumber C library
+
+The decNumber C library is:
+
+Copyright (c) 1995-2010 International Business Machines Corporation and others
+
+All rights reserved.
+
+The decNumber C library is made available under the terms of the ICU License -- ICU 1.8.1 and later,
 which can be found in the LICENSE-ICU file.
