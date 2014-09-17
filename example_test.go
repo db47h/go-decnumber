@@ -10,24 +10,19 @@ import (
 	"sync"
 )
 
-// Go re-implementation of decNumber's example1.c.
+// Go re-implementation of decNumber's example1.c - simple addition.
 //
-// Cnvert the first two argument words to decNumber, add them together, and display the result
+// Cnvert the first two argument words to decNumber, add them together, and display the result.
 func Example_example1() {
-	arg1 := "1.27"
-	arg2 := "2.23"
+	var (
+		arg1         = "1.27"
+		arg2         = "2.23"
+		digits int32 = 34
+	)
+	ctx := dec.NewContext(dec.InitBase, digits)
 
-	ctx := dec.NewContext(dec.InitBase, 34)
-
-	a := dec.NewNumber(ctx).FromString(arg1, ctx) // Should not ignore errors...
-	b := dec.NewNumber(ctx).FromString(arg2, ctx)
-
-	// Not in the original example: error checking.
-	// If an error occured while converting either a or b, err will be set to a non nil value
-	if err := ctx.ErrorStatus(); err != nil {
-		fmt.Printf("Error: %s\n", err)
-		return
-	}
+	a := dec.NewNumber(digits).FromString(arg1, ctx) // Should not ignore errors...
+	b := dec.NewNumber(digits).FromString(arg2, ctx)
 
 	a.Add(a, b, ctx) // a=a+b
 
@@ -43,12 +38,12 @@ func Example_NewNumber() {
 	// create a context with 99 digits precision, just for kicks
 	ctx := dec.NewContext(dec.InitBase, 99)
 	// create a number
-	n := dec.NewNumber(ctx)
+	n := dec.NewNumber(ctx.Digits())
 
 	// an IEEE 754 decimal128 type context
 	// using the default 34 digits precision
 	ctx = dec.NewContext(dec.InitDecimal128, 0)
-	n = dec.NewNumber(ctx)
+	n = dec.NewNumber(ctx.Digits())
 	// Set it to zero
 	n.Zero()
 	fmt.Println(n)
@@ -63,7 +58,7 @@ func ExampleNumber_FromString() {
 	ctx := dec.NewContext(dec.InitDecimal64, 0)
 	// We're lazy, and since we can do it, define a shorthand
 	New := func(s string) *dec.Number {
-		return dec.NewNumber(ctx).FromString(s, ctx)
+		return dec.NewNumber(ctx.Digits()).FromString(s, ctx)
 	}
 
 	n := New("378.2654651646516165416165315131232")
@@ -122,7 +117,7 @@ func ExampleNumberPool_1() {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
 
 	// New() function for the pool to create new numbers
-	newFunc := func() interface{} { return dec.NewNumber(ctx) }
+	newFunc := func() interface{} { return dec.NewNumber(ctx.Digits()) }
 
 	// create a pool. Either dec.Pool or sync.Pool will do
 	syncPool := sync.Pool{New: newFunc}
@@ -155,7 +150,7 @@ func ExampleNumberPool_2() {
 	// And a usable pool based on dec.Pool
 	pool := &dec.NumberPool{
 		&dec.Pool{
-			New: func() interface{} { return dec.NewNumber(ctx) },
+			New: func() interface{} { return dec.NewNumber(ctx.Digits()) },
 		},
 		ctx,
 	}

@@ -9,7 +9,6 @@ package dec
 
 #include "go-decnumber.h"
 #include "decContext.h"
-#include <stdlib.h>
 */
 import "C"
 

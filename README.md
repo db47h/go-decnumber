@@ -58,6 +58,7 @@ performance. Use
 
 to check which functions can be inlined.
 
+
 # Numbers, Context and precision
 
 The decNumber module can be built to use fixed precision numbers or arbitrary precision (changeable
@@ -79,9 +80,9 @@ track of which decNumber was created to work with which decContext (i.e. with en
 for that context). We tried several approaches to get rid of this context parameter in the Go
 implementation, but with no success. Suggestions welcome!
 
-Note that this is a non-issue for applications using a fixed precision, while applications that
-require dynamic precision can leverage the dec.NumberPool facility to keep track of their working
-context and free Number list with a single variable.
+Note that this is a non-issue for applications using a fixed precision (global Context), while
+applications that require dynamic precision can leverage the dec.NumberPool facility to keep track
+of their working context and free Number list with a single variable.
 
 
 # Go implementation details
@@ -103,6 +104,9 @@ valid value in a given arithmetic operation).
 - Using the same Number as operand and result, like in `n.Multiply(n, n, ctx)`, is legal and will not
   produce unexpected results.
 
+- Active eror handling via traps is not supported in the Go implementation. The os/signal package
+  does not seem to be able to handle signals raised from C code (this always causes a panic), while
+external signals can be handled just fine.
 
 ## Free-list of Numbers
 
@@ -117,10 +121,10 @@ For example:
 	// idomatic code for NumberPool creation
 	pool := &dec.NumberPool{
 		&sync.Pool{
-			New: func() interface{} { return dec.NewNumber(ctx) },
+			New: func() interface{} { return dec.NewNumber(ctx.Digits()) },
 		},
 		ctx,                             // same context as the one used in New()
-	}                              
+	}
 	number := pool.Get()                 // with no need to type cast to *Number
 	defer pool.Put(number)               // idiomatic code for short lived numbers
 	number.FromString("1243", pool.Context)
@@ -133,7 +137,6 @@ lightweight alternative to sync.Pool.
 If an application needs to change its arithmetic precision on the fly, any NumberPool built on top
 of the affected Context's will need to be discarded and recreated along with the Context. This will
 not affect existing numbers that can still be used as valid operands in arithmetic functions.
-
 
 ## Example scenario
 

@@ -12,12 +12,13 @@ import (
 
 var (
 	// Global context
-	gCtx = dec.NewContext(dec.InitBase, 25) // 25 digits
+	gCtx   = dec.NewContext(dec.InitBase, 25) // 25 digits
+	digits = gCtx.Digits()
 
 	// Some constants
-	one     = dec.NewNumber(gCtx).FromString("1", gCtx)   // 1
-	mTwo    = dec.NewNumber(gCtx).FromString("-2", gCtx)  // -2
-	hundred = dec.NewNumber(gCtx).FromString("100", gCtx) // 100
+	one     = dec.NewNumber(digits).FromString("1", gCtx)   // 1
+	mTwo    = dec.NewNumber(digits).FromString("-2", gCtx)  // -2
+	hundred = dec.NewNumber(digits).FromString("100", gCtx) // 100
 )
 
 // CompoundInterest calculates compound interests.
@@ -50,7 +51,8 @@ func CompoundInterest(p *dec.NumberPool, start *dec.Number, rate *dec.Number, ye
 
 }
 
-// Extended re-implementation of decNumber's example2.c.
+// Extended re-implementation of decNumber's example2.c - compound interest. With added error
+// handling from example3.c.
 func Example_example2() {
 
 	// This is our main function where we setup a NumberPool and collect
@@ -58,7 +60,7 @@ func Example_example2() {
 
 	// Create a global NumberPool
 	p := &dec.NumberPool{
-		&sync.Pool{New: func() interface{} { return dec.NewNumber(gCtx) }},
+		&sync.Pool{New: func() interface{} { return dec.NewNumber(gCtx.Digits()) }},
 		gCtx,
 	}
 	// arguments for CompoundInterest

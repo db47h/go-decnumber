@@ -1,6 +1,6 @@
 # customize this
 LIB          := libdecnumber
-SOURCES      := decQuad.c decNumber.c decContext.c
+SOURCES      := decQuad.c decimal64.c decimal128.c decPacked.c decNumber.c decContext.c
 HEADER_FILES := decNumberLocal.h
 # default to little endian. Run make DECLITEND=0 on big endian architectures
 DECLITEND    ?= 1

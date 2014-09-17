@@ -49,7 +49,7 @@ For example:
 	// idomatic code for NumberPool creation
 	pool := &dec.NumberPool{
 		&sync.Pool{
-			New: func() interface{} { return dec.NewNumber(ctx) },
+			New: func() interface{} { return dec.NewNumber(ctx.Digits()) },
 		},
 		ctx,                             // same context as the one used in New()
 	}

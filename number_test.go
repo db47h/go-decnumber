@@ -11,7 +11,7 @@ import (
 
 func TestNumber_String(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
-	n := dec.NewNumber(ctx).FromString("1.27", ctx)
+	n := dec.NewNumber(ctx.Digits()).FromString("1.27", ctx)
 	if err := ctx.ErrorStatus(); err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestNumber_String(t *testing.T) {
 
 func TestNumber_Zero(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
-	n := dec.NewNumber(ctx).FromString("1.27", ctx)
+	n := dec.NewNumber(ctx.Digits()).FromString("1.27", ctx)
 	if err := ctx.ErrorStatus(); err != nil {
 		t.Fatal(err)
 	}

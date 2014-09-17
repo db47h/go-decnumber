@@ -76,8 +76,7 @@ func (s *Status) SetFromString(str string) error {
 			return nil
 		}
 	}
-	err := ConversionSyntax
-	return err.ToError()
+	return ContextError(ConversionSyntax)
 }
 
 // Set sets one or more status bits in the status field. Since traps are

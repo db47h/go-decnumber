@@ -32,17 +32,17 @@ type Number struct {
 	dn *C.decNumber // Pointer to the embedded decNumber
 }
 
-// NewNumber returns, as a *Number, a new uinitialized Number suitable for use in the given Context.
-// i.e. with enough storage space to hold the context's required number of digits. If memory cannot
-// be allocated for the new number, the function will panic.
+// NewNumber returns, as a *Number, a new uinitialized Number with enough storage space for the
+// requested number of digits. If memory cannot be allocated for the new number, the function will
+// panic.
 //
 // Since the Number is unitialized, its value is not valid and must be initialized from some source
 // before using it as an operand in an arithmetic operation. This is not necessary if the Number is
 // to be used as the result of such operation.
-func NewNumber(ctx *Context) *Number {
+func NewNumber(digits int32) *Number {
 	num := &Number{}
 	// required structure size do hold the requested amount of digits
-	num.dn = C.new_decNumber(C.int32_t(ctx.Digits()))
+	num.dn = C.new_decNumber(C.int32_t(digits))
 	if num.dn == nil {
 		panic("Malloc failed")
 	}
@@ -55,6 +55,16 @@ func (n *Number) finalize() {
 		C.free(unsafe.Pointer(n.dn))
 		n.dn = nil
 	}
+}
+
+// DecNumber returns a pointer to the underlying decNumber C struct
+func (n *Number) DecNumber() *C.decNumber {
+	return n.dn
+}
+
+// Digits() returns the number of digits in a Number
+func (n *Number) Digits() int32 {
+	return int32(n.dn.digits)
 }
 
 // Zero sets the value of a Number to zero.
