@@ -234,6 +234,7 @@ seconds on my workstation, versus only 1 second when using the syso mechanism.
 
 - Implement basic math functions.
 - Thoroughly test free-list management and resource clean-up.
+- Clarify limitations on mathematical operations in a place than Context.
 
 
 # Licensing

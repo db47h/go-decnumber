@@ -160,10 +160,10 @@ func (s *Status) ToError() error {
 
 // ContextError represents an error condition for a Context. One can check if the last operation
 // in a Context generated an error either with Context.ErrorStatus() (returns a ContextError cast as
-// an error) or Context.TestStatus(Context.Errors) (returns true if an error occured).
+// an error) or Context.TestStatus(Context.Errors) which returns true if an error occured.
 type ContextError Status
 
-// Error returns a string representation of the error status
+// Error returns a string representation of the error status.
 func (e ContextError) Error() string {
 	return (*Status)(&e).String()
 }

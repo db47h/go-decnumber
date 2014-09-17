@@ -27,7 +27,7 @@ const (
 	RoundMax                      // enum must be less than this
 )
 
-// ContextKind to use when creating a new Context with NewContext()
+// ContextKind to use when creating a new Context with NewContext().
 //
 // The settings for a context are as follows, depending on the ContextKind value:
 //
@@ -102,15 +102,15 @@ type Context struct {
 // digits is used to set the precision to be used for an operation. The result of an
 // operation will be rounded to this length if necessary. digits should be in [MinDigits, MaxDigits].
 // The maximum supported value for digits in many arithmetic operations is MaxMath. If digits is 0,
-// the context will be configured use the default number of digits according to ContextKind.
+// the context will be configured to use the default number of digits according to ContextKind.
 //
 // Note that the default exponent settings for InitBase will be too large for many arithmetic
 // operations. These defaults can be adjusted with SetEMax(), SetEMin(), SetRounding() and SetClamp().
 //
 // Although the native byte order should be properly detected at build time, NewContext() will
 // check the runtime byte order and panic if the byte order is not set correctly. If your code panics
-// on this check, please file a bug report. New context will also panic if initialized with an
-// Unsupported ContextKind.
+// on this check, please file a bug report. Check for any errors after context creation by calling
+// Context.ErrorStatus().
 func NewContext(kind ContextKind, digits int32) (pContext *Context) {
 	if C.decContextTestEndian(1) != 0 {
 		panic("Wrong byte order for this architecture. Please file a bug report.")
@@ -128,17 +128,17 @@ func NewContext(kind ContextKind, digits int32) (pContext *Context) {
 	return
 }
 
-// DecContext returns a pointer to the underlying decContext C struct
+// DecContext returns a pointer to the underlying decContext C struct. This is for internal use.
 func (c *Context) DecContext() *C.decContext {
 	return &c.ctx
 }
 
-// Digits gets the working precision
+// Digits gets the working precision.
 func (c *Context) Digits() int32 {
 	return int32(c.ctx.digits)
 }
 
-// EMin returns the Context's EMin setting
+// EMin returns the Context's EMin setting.
 func (c *Context) EMin() int32 {
 	return int32(c.ctx.emin)
 }
@@ -149,11 +149,14 @@ func (c *Context) EMin() int32 {
 // numbers. The adjusted exponent is calculated as though the number were expressed in
 // scientific notation (that is, except for 0, expressed with one non-zero digit before the
 // decimal point).
+//
 // If the adjusted exponent for a result or conversion would be smaller than emin then the
 // result is subnormal. If the result is also inexact, an underflow results. The exponent of
 // the smallest possible number (closest to zero) will be emin-digits+1. EMin is usually set to
 // -EMax or to -(EMax-1). EMin should be in [MinEMin, MaxEMin]. The minimum supported value for
 // EMin in many arithmetic operations is -MaxMath.
+//
+// Returns c.
 func (c *Context) SetEMin(eMin int32) *Context {
 	c.ctx.emin = C.int32_t(eMin)
 	return c
@@ -170,20 +173,23 @@ func (c *Context) EMax() int32 {
 // permitted. The adjusted exponent is calculated as though the number were expressed in
 // scientific notation (that is, except for 0, expressed with one non-zero digit before the
 // decimal point).
+//
 // If the adjusted exponent for a result or conversion would be larger than emax then an
 // overflow results. EMax should be in [MinEMax, MaxEMax]. The maximum supported value for EMax
 // in many arithmetic operations is MaxMath.
+//
+// Returns c.
 func (c *Context) SetEMax(eMax int32) *Context {
 	c.ctx.emax = C.int32_t(eMax)
 	return c
 }
 
-// Clamp returns the Context's clamping setting
+// Clamp returns the Context's clamping setting.
 func (c *Context) Clamp() int8 {
 	return int8(c.ctx.clamp)
 }
 
-// SetClamp sets the Context's Clamp setting to the specified value.
+// SetClamp sets the Context's clamp setting to the specified value.
 //
 // clamp controls explicit exponent clamping, as is applied when a result is
 // encoded in one of the compressed formats. When 0, a result exponent is limited to a
@@ -192,43 +198,48 @@ func (c *Context) Clamp() int8 {
 // but is limited to a maximum of emax-(digits-1). As well as clamping zeros, this may
 // cause the coefficient of a result to be padded with zeros on the right in order to bring the
 // exponent within range.
+//
 // For example, if emax is +96 and digits is 7, the result 1.23E+96 would have a [sign,
 // coefficient, exponent] of [0, 123, 94] if clamp were 0, but would give [0, 1230000,
 // 90] if clamp were 1.
+//
 // Also when 1, clamp limits the length of NaN payloads to digits-1 (rather than digits) when
 // constructing a NaN by conversion from a string.
+//
+// Returns c.
 func (c *Context) SetClamp(clamp int8) *Context {
 	c.ctx.clamp = C.uint8_t(clamp)
 	return c
 }
 
-// Rounding gets the rounding mode
+// Rounding gets the rounding mode.
 func (c *Context) Rounding() Rounding {
 	// return Rounding(C.decContextGetRounding(&c.ctx))
 	return Rounding(c.ctx.round)
 }
 
-// SetRounding sets the rounding mode
+// SetRounding sets the rounding mode.
 //
-// iRounding is used to select the rounding algorithm to be used if rounding is
+// Rounding is used to select the rounding algorithm to be used if rounding is
 // necessary during an operation. It must be one of the values in the Rounding
 // enumeration.
+//
+// Returns c.
 func (c *Context) SetRounding(round Rounding) *Context {
 	// C.decContextSetRounding(&c.ctx, uint32(round))
 	c.ctx.round = uint32(round) // C enums have a Go type, not C
 	return c
 }
 
-// Status returns the status of a Context
+// Status returns the status of a Context.
 func (c *Context) Status() *Status {
 	// return Status(C.decContextGetStatus(&c.ctx))
 	return (*Status)(&c.ctx.status)
 }
 
-// Func ErrorStatus() checks the Context status for any error condition
-// and returns, as an error, a ContextError if any, nil otherwise.
-// Convert the return value with err.(dec.ContextError) to compare it
-// against any of the Status values. This is a shorthand for Context.Status().ToError()
+// ErrorStatus checks the Context status for any error condition and returns, as an error, a
+// ContextError if any, nil otherwise.  Convert the return value with err.(dec.ContextError) to
+// compare it against any of the Status values. This is a shorthand for Context.Status().ToError()
 func (c *Context) ErrorStatus() error {
 	return c.Status().ToError()
 }

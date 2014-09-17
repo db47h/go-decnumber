@@ -57,12 +57,12 @@ func (n *Number) finalize() {
 	}
 }
 
-// DecNumber returns a pointer to the underlying decNumber C struct
+// DecNumber returns a pointer to the underlying decNumber C struct.
 func (n *Number) DecNumber() *C.decNumber {
 	return n.dn
 }
 
-// Digits() returns the number of digits in a Number
+// Digits() returns the number of digits in a Number.
 func (n *Number) Digits() int32 {
 	return int32(n.dn.digits)
 }
@@ -79,8 +79,8 @@ func (n *Number) Zero() *Number {
 	return n
 }
 
-// String converts a Number to a character string, using scientific notation if
-// an exponent is needed (that is, there will be just one digit before any decimal point). It implements the
+// String converts a Number to a character string, using scientific notation if an exponent is
+// needed (that is, there will be just one digit before any decimal point). It implements the
 // to-scientific-string conversion.
 func (n *Number) String() string {
 	nDigits := C.size_t(n.dn.digits)
@@ -97,8 +97,8 @@ func (n *Number) String() string {
 	return C.GoString(str)
 }
 
-// FromString converts a string to a Number. It implements the to-number conversion from the arithmetic
-// specification.
+// FromString converts a string to a Number. It implements the to-number conversion from the
+// arithmetic specification.
 //
 // The length of the coefficient and the size of the exponent are checked by this routine, so the
 // correct error (Underflow or Overflow) can be reported or rounding applied, as necessary. If bad
@@ -129,7 +129,7 @@ type NumberPool struct {
 	*Context
 }
 
-// Get returns a free *Number from the pool
+// Get returns a free *Number from the pool.
 func (p *NumberPool) Get() *Number {
 	return p.Pooler.Get().(*Number)
 }
@@ -146,7 +146,7 @@ func (p *NumberPool) Get() *Number {
 
 // NumberAdd adds two numbers. Computes res = lhs + rhs.
 //
-// Returns res
+// Returns res.
 func (res *Number) Add(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
@@ -154,7 +154,7 @@ func (res *Number) Add(lhs *Number, rhs *Number, ctx *Context) *Number {
 
 // NumberMultiply multiplies one number by another. Computes res = lhs * rhs.
 //
-// Returns res
+// Returns res.
 func (res *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
@@ -162,7 +162,7 @@ func (res *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
 
 // NumberDivide divides one number by another. Computes res = lhs / rhs.
 //
-// Returns res
+// Returns res.
 func (res *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
@@ -170,21 +170,19 @@ func (res *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
 
 // NumberPower raises a number to a power. Computes res = lhs ** rhs (lhs raised to the power of rhs).
 //
-// Mathematical function restrictions apply; a NaN is
-// returned with Invalidoperation if a restriction is violated.
+// Mathematical function restrictions apply; a NaN is returned with Invalidoperation if a
+// restriction is violated.
 //
-// However, if 1999999997 <= rhs <= 999999999 and rhs is an integer then the
-// restrictions on lhs and the context are relaxed to the usual bounds,
-// for compatibility with the earlier (integer power only) version
-// of this function.
+// However, if 1999999997 <= rhs <= 999999999 and rhs is an integer then the restrictions on lhs and
+// the context are relaxed to the usual bounds, for compatibility with the earlier (integer power
+// only) version of this function.
 //
 // When rhs is an integer, the result may be exact, even if rounded.
 //
-// The final result is rounded according to the context; it will
-// almost always be correctly rounded, but may be up to 1 ulp in
-// error in rare cases.
+// The final result is rounded according to the context; it will almost always be correctly rounded,
+// but may be up to 1 ulp in error in rare cases.
 //
-// Returns res
+// Returns res.
 func (res *Number) Power(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberPower(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
@@ -194,7 +192,7 @@ func (res *Number) Power(lhs *Number, rhs *Number, ctx *Context) *Number {
 // coefficient of res (by rounding or shifting) such that the exponent (-scale) of res has the value rhs.
 // The numerical value of res will equal lhs, except for the effects of any rounding that occurred.
 //
-// Returns res
+// Returns res.
 func (res *Number) Rescale(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return res
