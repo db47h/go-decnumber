@@ -15,6 +15,9 @@ import "C"
 // Rounding represents the rounding mode used by a given Context.
 type Rounding uint32
 
+// LittleEndian will be true if the currend hadware is little endian.
+const LittleEndian bool = C.DECLITEND == 1
+
 const (
 	RoundCeiling  Rounding = iota // round towards +infinity
 	RoundUp                       // round away from 0
@@ -104,8 +107,9 @@ type Context struct {
 // The maximum supported value for digits in many arithmetic operations is MaxMath. If digits is 0,
 // the context will be configured to use the default number of digits according to ContextKind.
 //
-// Note that the default exponent settings for InitBase will be too large for many arithmetic
-// operations. These defaults can be adjusted with SetEMax(), SetEMin(), SetRounding() and SetClamp().
+// Note that the default exponent settings for InitBase will be too large for the few Number methods
+// that are considered mathematical functions. These defaults can be adjusted with SetEMax(),
+// SetEMin(), SetRounding() and SetClamp().
 //
 // Although the native byte order should be properly detected at build time, NewContext() will
 // check the runtime byte order and panic if the byte order is not set correctly. If your code panics

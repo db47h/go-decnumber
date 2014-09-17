@@ -172,17 +172,13 @@ either.
 A thread safe application could use an immutable global context with a sync.Pool to manage Number
 allocation, and share Number's between goroutines by communicating.
 
-## What about decDouble, decQuad ?
+## What about decimal32/64/128, decDouble, decQuad ?
 
-Right now, the dec package only supports decNumber. Adding support for any of the *float* modules would
-require:
+Right now, the main focus of the dec package is on decNumber. Other modules are only partially
+implemented with just enough functionality implemented to be able to run the C decNumber examples.
 
-- Adding the relevant type in the dec module
-- Free list management is less necessary for the float types since their size is static (128 bits
-  for Quad), unlike Number which has a variable size (depending on the Context's precision) and
-require malloc/feee calls. Given their small size, Quad's that are not used outside of a function's
-body should be allocated on the stack (to be tested).
-
+The decimal 32 type needs to be added to decimal.go, along with a full implementation of decimal32,
+decimal64 and decimal128.
 
 # Building / Installing
 
@@ -233,8 +229,7 @@ seconds on my workstation, versus only 1 second when using the syso mechanism.
 # TODO
 
 - Implement basic math functions.
-- Thoroughly test free-list management and resource clean-up.
-- Clarify limitations on mathematical operations in a place than Context.
+- Thoroughly test free-list management and proper resource clean-up.
 
 
 # Licensing

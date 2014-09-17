@@ -33,6 +33,106 @@ func Example_example1() {
 	// 1.27 + 2.23 => 3.50
 }
 
+// Go re-implementation of decNumber's example5.c. Compressed formats.
+func Example_example5() {
+	var (
+		a     = new(dec.Decimal64)
+		d     *dec.Number
+		ctx   *dec.Context
+		hexes string
+	)
+
+	ctx = dec.NewContext(dec.InitDecimal64, 0) // will be 16 digits
+
+	a.FromString("127.9984", ctx)
+	// lay out the decimal64 as eight hexadecimal pairs
+	// big endian - ordered
+	for _, b := range a.Bytes() {
+		if dec.LittleEndian {
+			hexes = fmt.Sprintf("%02X ", b) + hexes
+		} else {
+			hexes += fmt.Sprintf("%02X ", b)
+		}
+	}
+
+	d = a.ToNumber(nil)
+	fmt.Printf("%s => %s=> %s\n", a, hexes, d)
+
+	// Output:
+	// 127.9984 => 22 28 00 00 00 15 E6 8E => 127.9984
+}
+
+// Go re-implementation of decNumber's example6.c. Packed Decimal numbers.
+//
+// This example reworks Example 2, starting and ending with Packed Decimal numbers.
+func Example_example6() {
+
+	// This is our main function where we setup a NumberPool and collect
+	// arguments.
+
+	// Create a global NumberPool
+	p := &dec.NumberPool{
+		&dec.Pool{New: func() interface{} { return dec.NewNumber(gCtx.Digits()) }},
+		gCtx,
+	}
+	// arguments for CompoundInterest
+	var (
+		startp   = dec.Packed{[]byte{0x5C}, -4}      // 5e+4 = 50000
+		ratep    = dec.Packed{[]byte{0x31, 0x7C}, 2} // 3.17
+		yearsp   = dec.Packed{[]byte{0x01, 0x2C}, 0} // 12
+		start, _ = startp.ToNumber(nil)
+		rate, _  = ratep.ToNumber(nil)
+		years, _ = yearsp.ToNumber(nil)
+	)
+
+	// do some computing at last
+	total, err := CompoundInterest(p, start, rate, years)
+
+	// error check ?
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+	}
+
+	// print results
+	fmt.Printf("%s at %s%% for %s years => %s\n", start, rate, years, total)
+	resPacked := new(dec.Packed)
+	resPacked.FromNumber(total)
+	// and dispose of the result
+	defer p.Put(total)
+
+	for _, d := range resPacked.Buf {
+		fmt.Printf("%02X ", d)
+	}
+	fmt.Printf("(scale: %d)\n", resPacked.Scale)
+
+	// Output:
+	// 5E+4 at 3.17% for 12 years => 72712.85
+	// 72 71 28 5C (scale: 2)
+}
+
+// Go re-implementation of decNumber's example7.c. Using decQuad to add two numbers together.
+func Example_example7() {
+	var (
+		a   = new(dec.Quad)
+		b   = new(dec.Quad)
+		ctx *dec.Context
+	)
+
+	// Context suitable for Quads
+	ctx = dec.NewContext(dec.InitQuad, 0)
+
+	a.FromString("123.456", ctx)
+	b.FromString("7890.12", ctx)
+	a.Add(a, b, ctx) // a = a + b
+
+	s := a.String()
+
+	fmt.Printf("123.456 + %s => %s\n", b, s)
+
+	// Output:
+	// 123.456 + 7890.12 => 8013.576
+}
+
 // NewNumber() example
 func Example_NewNumber() {
 	// create a context with 99 digits precision, just for kicks

@@ -8,6 +8,7 @@ package dec
 #include "go-decnumber.h"
 #include "decNumber.h"
 #include <stdlib.h>
+#include <string.h>
 
 // Helpers for go code
 decNumber * new_decNumber(int32_t digits) {
@@ -26,6 +27,11 @@ import (
 // hundreds of digits); in particular it allows the use of fixed sized structures and minimizes copy and
 // move operations. The functions in the module, however, support arbitrary precision arithmetic (up to
 // 999,999,999 decimal digits, with exponents up to 9 digits).
+//
+// Some functions, such as Number.Exp(), are described as mathematical functions. These have some
+// restrictions: Context.EMax() must be <= Context.MaxMath, context.EMin must be >=
+// -Context.MaxMath, and Context.Digits() must be <= Context.MaxMath. Non-zero operands to these
+// functions must also fit within these bounds.
 //
 // Numbers should be created via the NewNumber() function.
 type Number struct {
@@ -83,18 +89,14 @@ func (n *Number) Zero() *Number {
 // needed (that is, there will be just one digit before any decimal point). It implements the
 // to-scientific-string conversion.
 func (n *Number) String() string {
-	nDigits := C.size_t(n.dn.digits)
+	nDigits := int(n.dn.digits)
 	if nDigits == 0 {
 		nDigits++
 	}
-	str := (*C.char)(C.malloc(nDigits + 14))
-	if str == nil {
-		panic("Malloc failed")
-	}
-	defer C.free(unsafe.Pointer(str))
-
-	C.decNumberToString(n.dn, str)
-	return C.GoString(str)
+	str := make([]byte, nDigits+14) // TODO: escapes to heap, need to check how fmt uses sync.Pool
+	pStr := (*C.char)(unsafe.Pointer(&str[0]))
+	C.decNumberToString(n.dn, pStr)
+	return string(str[:C.strlen(pStr)])
 }
 
 // FromString converts a string to a Number. It implements the to-number conversion from the
