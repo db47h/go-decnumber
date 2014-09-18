@@ -1,5 +1,8 @@
 #!/bin/sh
 
+echo "This script is obsolete and needs some work. Please use the Makefiles instead."
+exit
+
 # Use this if you don't have a working make
 #
 # in the CFLAGS below, set DECLITEND to 0 if your architecture is big endian
@@ -22,7 +25,7 @@ set -x # display commands as they are being run
 "$CC" $CFLAGS -c -o obj/decContext.o decContext.c
 
 # build static library
-"$AR" rcs lib/libdecnumber.a obj/decQuad.o obj/decNumber.o obj/decContext.o
+# "$AR" rcs lib/libdecnumber.a obj/decQuad.o obj/decNumber.o obj/decContext.o
 
-# And syso
-# "$LD" -r lib/*.o -o ../libdecnumber.syso
+# build syso
+"$LD" -r lib/*.o -o ../libdecnumber.syso
