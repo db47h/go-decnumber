@@ -133,6 +133,28 @@ func Example_example7() {
 	// 123.456 + 7890.12 => 8013.576
 }
 
+// Go re-implementation of decNumber's example8.c.  Using Quad with Number
+func Example_example8() {
+	var (
+		a          = new(dec.Quad)
+		numa, numb *dec.Number
+		ctx        = dec.NewContext(dec.InitQuad, 0) // Initialize
+	)
+
+	a.FromString("1234.567", ctx) // get a
+	as := a.String()              // keep a string copy for test output
+	a.Add(a, a, ctx)              // double a
+	numa = a.ToNumber(nil)        // convert to Number
+	numb = dec.NewNumber(ctx.Digits()).FromString("98.7654", ctx)
+	numa.Power(numa, numb, ctx) // numa=numa**numb
+	a.FromNumber(numa, ctx)     // back to quad
+
+	fmt.Printf("power(2*%s, %s) => %s \n", as, numb, a)
+
+	// Output:
+	// power(2*1234.567, 98.7654) => 1.164207353496260978533862797373143E+335
+}
+
 // NewNumber() example
 func Example_NewNumber() {
 	// create a context with 99 digits precision, just for kicks

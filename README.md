@@ -175,10 +175,23 @@ allocation, and share Number's between goroutines by communicating.
 ## What about decimal32/64/128, decDouble, decQuad ?
 
 Right now, the main focus of the dec package is on decNumber. Other modules are only partially
-implemented with just enough functionality implemented to be able to run the C decNumber examples.
+implemented with just enough functionality to be able to run the C decNumber examples.
 
-The decimal 32 type needs to be added to decimal.go, along with a full implementation of decimal32,
-decimal64 and decimal128.
+In the C implementation, decQuads are defined in a supporting module for the decimal128 format and
+provide a set of functions that work directly in this format. The decimal128 and decQuad structures
+are identical (except in name) so pointers to the structures can safely be cast from one to the
+other.  The separation between decQuad and decimal128 in the source code allowed to use the decQuad
+module stand-alone (athat is, it has no dependency on the decNumber module).
+
+The same goes for decSingle and decimal32, decDouble and decimal64.
+
+In the Go implementation, and even if we could split the wrapper into sub-packages, this separation
+does not make much sense since we want to provide access to everything that decNumber has to offer.
+The linker will take care of including only the used bits and pieces into the final application
+executable.
+
+As such, the decimal32/64/128 will be merged into Single, Double and Quad.
+
 
 # Building / Installing
 
@@ -220,8 +233,8 @@ The top level Makefile (at the root of the package folder) has the following tar
 	make test       # test using the syso file, compiling it if necessary
 	make clean      # the usual + removes the syso file.
 
-In the early days of the package, running tests using the Go->C wrappers (for only 2 C files) took 3
-seconds on my workstation, versus only 1 second when using the syso mechanism.
+Running tests using the Go->C wrappers takes 6.7 seconds on my workstation, versus only 1.6 second
+when using the syso mechanism.
 
 [syso]: https://code.google.com/p/go-wiki/wiki/GcToolchainTricks#Use_syso_file_to_embed_arbitrary_self-contained_C_code
 
@@ -230,7 +243,7 @@ seconds on my workstation, versus only 1 second when using the syso mechanism.
 
 - Implement basic math functions.
 - Thoroughly test free-list management and proper resource clean-up.
-
+- merge decimal32/64/128 into Single, Double and Quad.
 
 # Licensing
 

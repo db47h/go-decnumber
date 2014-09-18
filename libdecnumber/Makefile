@@ -1,6 +1,6 @@
 # customize this
 LIB          := libdecnumber
-SOURCES      := decQuad.c decimal64.c decimal128.c decPacked.c decNumber.c decContext.c
+SOURCES      := decQuad.c decimal32.c decimal64.c decimal128.c decPacked.c decNumber.c decContext.c
 HEADER_FILES := decNumberLocal.h
 # default to little endian. Run make DECLITEND=0 on big endian architectures
 DECLITEND    ?= 1
@@ -39,7 +39,7 @@ $(STATICLIB): $(OBJECTS) $(LIBDIR)
 	$(AR) rcs $@ $^
 
 # The following also works with: $(LD) -r input1.o ... inputN.o -o output.syso
-# here we use the GCC frontend instead of ld for easier cross-compiling
+# here we use the GCC frontend instead of ld in order to make cross-compiling easier.
 $(SYSOBJECT): $(OBJECTS)
 	$(CC) $(CFLAGS) -nostdlib -Wl,-r $^ -o $@
 
