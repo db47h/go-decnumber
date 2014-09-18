@@ -36,16 +36,16 @@ func Example_example1() {
 // Go re-implementation of decNumber's example5.c. Compressed formats.
 func Example_example5() {
 	var (
-		a     = new(dec.Decimal64)
+		a     = new(dec.Quad) // Should be dec.Double, but not implemented yet
 		d     *dec.Number
 		ctx   *dec.Context
 		hexes string
 	)
 
-	ctx = dec.NewContext(dec.InitDecimal64, 0) // will be 16 digits
+	ctx = dec.NewContext(dec.InitDecimal128, 0) // will be 16 digits
 
 	a.FromString("127.9984", ctx)
-	// lay out the decimal64 as eight hexadecimal pairs
+	// lay out the Quad as hexadecimal pairs
 	// big endian - ordered
 	for _, b := range a.Bytes() {
 		if dec.LittleEndian {
@@ -59,7 +59,7 @@ func Example_example5() {
 	fmt.Printf("%s => %s=> %s\n", a, hexes, d)
 
 	// Output:
-	// 127.9984 => 22 28 00 00 00 15 E6 8E => 127.9984
+	// 127.9984 => 22 07 00 00 00 00 00 00 00 00 00 00 00 15 E6 8E => 127.9984
 }
 
 // Go re-implementation of decNumber's example6.c. Packed Decimal numbers.

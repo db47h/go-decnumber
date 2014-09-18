@@ -108,6 +108,19 @@ valid value in a given arithmetic operation).
   does not seem to be able to handle signals raised from C code (this always causes a panic), while
 external signals can be handled just fine.
 
+In the C implementation, decQuads are defined in a supporting module for the decimal128 format and
+provide a set of functions that work directly in this format. The decimal128 and decQuad structures
+are identical (except in name) so pointers to the structures can safely be cast from one to the
+other.  The separation between decQuad and decimal128 in the source code allowed to use the decQuad
+module stand-alone (that is, it has no dependency on the decNumber module).
+
+The same goes for decSingle and decimal32, decDouble and decimal64.
+
+In the Go implementation, and even if we could split the wrapper into sub-packages, this separation
+does not make much sense since we want to provide access to everything that decNumber has to offer;
+the linker will take care of including only the used bits and pieces into the final application
+executable. As such, the decimal32/64/128 are merged into Single, Double and Quad.
+
 ## Free-list of Numbers
 
 The package provides facilities for managing free-lists of Numbers in order to relieve pressure on
@@ -172,25 +185,11 @@ either.
 A thread safe application could use an immutable global context with a sync.Pool to manage Number
 allocation, and share Number's between goroutines by communicating.
 
-## What about decimal32/64/128, decDouble, decQuad ?
+## What about decSingle, decDouble, decQuad ?
 
 Right now, the main focus of the dec package is on decNumber. Other modules are only partially
-implemented with just enough functionality to be able to run the C decNumber examples.
-
-In the C implementation, decQuads are defined in a supporting module for the decimal128 format and
-provide a set of functions that work directly in this format. The decimal128 and decQuad structures
-are identical (except in name) so pointers to the structures can safely be cast from one to the
-other.  The separation between decQuad and decimal128 in the source code allowed to use the decQuad
-module stand-alone (athat is, it has no dependency on the decNumber module).
-
-The same goes for decSingle and decimal32, decDouble and decimal64.
-
-In the Go implementation, and even if we could split the wrapper into sub-packages, this separation
-does not make much sense since we want to provide access to everything that decNumber has to offer.
-The linker will take care of including only the used bits and pieces into the final application
-executable.
-
-As such, the decimal32/64/128 will be merged into Single, Double and Quad.
+implemented with just enough functionality to be able to run the C decNumber examples. decQuad will
+be next.
 
 
 # Building / Installing

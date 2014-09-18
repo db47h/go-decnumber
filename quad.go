@@ -10,22 +10,6 @@ package dec
 #include "decimal128.h"
 #include <stdlib.h>
 #include <string.h>
-
-// decQuadTo/FromNumber are implemented as macros in the C version (type casting decQuad to
-// decimal128), and it's impossible to "call" these macros from Go.
-
-// Doing something like ((*Decimal128)unsafe.Pointer(quad)).FromString() seems to work
-// but I'd rather not play with pointers of different types pointing to the same address.
-// So we do it in C, away from Go's eyes, and re-implement the corresponding wrappers.
-
-#undef decQuadToNumber
-static inline decNumber *decQuadToNumber(decQuad *dq, decNumber *dn) {
-	return decimal128ToNumber((decimal128 *)(dq), dn);
-}
-#undef decQuadFromNumber
-static inline decQuad *decQuadFromNumber(decQuad *dq, decNumber *dn, decContext *set) {
-	return (decQuad *)decimal128FromNumber((decimal128 *)(dq), dn, set);
-}
 */
 import "C"
 
@@ -34,17 +18,24 @@ import (
 )
 
 const (
-	Quad_Digits = 34
+	QuadDigits = C.DECQUAD_Pmax
+	QuadBytes  = C.DECQUAD_Bytes
 )
 
 // a decQuad represents a 128-bit decimal type in the IEEE 754 Standard for Floating Point Arithmetic.
 //
-// The Quad and Decimal128 structures are identical (except in name).
+// The Quad and Decimal128 structures are identical (except in name). Thus, Decimal128 specific functions
+// have been merged in Quad's method set.
 //
 // Conversions to and from the Number internal format are not needed (typically the numbers are
 // represented internally in “unpacked” BCD or in a base of some other power of ten), and no memory
 // allocation is necessary, so Quads are much faster than using Number for arithmetic computations.
 type Quad C.decQuad
+
+// Bytes[] returns the contents of the number as a raw byte slice.
+func (q *Quad) Bytes() []byte {
+	return C.GoBytes(unsafe.Pointer(q), QuadBytes)
+}
 
 // FromString converts a string to a Quad.
 //
@@ -86,16 +77,16 @@ func (q *Quad) EngString() string {
 // No error is possible.
 func (q *Quad) ToNumber(n *Number) *Number {
 	if n == nil {
-		n = NewNumber(Quad_Digits)
+		n = NewNumber(QuadDigits)
 	}
-	C.decQuadToNumber((*C.decQuad)(q), n.DecNumber())
+	C.decimal128ToNumber((*C.decimal128)(unsafe.Pointer(q)), n.DecNumber())
 	return n
 }
 
 // FromNumber converts a Number to a Quad.
 //
 // The Context is used only for status reporting and for the rounding mode (used if the coefficient
-// is more than Quad_Digits digits or an overflow is detected). If the exponent is out of the
+// is more than QuadDigits digits or an overflow is detected). If the exponent is out of the
 // valid range then Overflow or Underflow will be raised.  After Underflow a subnormal result is
 // possible.
 //
@@ -105,8 +96,25 @@ func (q *Quad) ToNumber(n *Number) *Number {
 //
 // returns q.
 func (q *Quad) FromNumber(source *Number, ctx *Context) *Quad {
-	C.decQuadFromNumber((*C.decQuad)(q), source.DecNumber(), ctx.DecContext())
+	C.decimal128FromNumber((*C.decimal128)(unsafe.Pointer(q)), source.DecNumber(), ctx.DecContext())
 	return q
+}
+
+// Canonical copies an enoding, ensuring it is canonical.
+//
+// source may be the same as q.
+//
+// Returns q.
+//
+// No error is possible.
+func (q *Quad) Canonical(source *Quad) *Quad {
+	C.decQuadCanonical((*C.decQuad)(q), (*C.decQuad)(source))
+	return q
+}
+
+// IsCanonical tests wether encoding is canonical.
+func (q *Quad) IsCanonical() bool {
+	return C.decQuadIsCanonical((*C.decQuad)(q)) != 0
 }
 
 func (q *Quad) Add(lhs *Quad, rhs *Quad, ctx *Context) *Quad {

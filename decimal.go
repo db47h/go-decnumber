@@ -14,9 +14,12 @@ package dec
 #include <stdlib.h>
 #include <string.h>
 */
+/*
+// DISABLED. Will be merged in Quad, Double, Single
 import "C"
 
 import "unsafe"
+
 
 const (
 	Decimal32_Digits  = 7
@@ -302,3 +305,4 @@ func (d *Decimal128) Canonical(source *Decimal128) *Decimal128 {
 func (d *Decimal128) IsCanonical() bool {
 	return C.decimal128IsCanonical((*C.decimal128)(d)) != 0
 }
+*/

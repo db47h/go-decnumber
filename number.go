@@ -146,31 +146,55 @@ func (p *NumberPool) Get() *Number {
 // Arithmetic functions
 //
 
-// NumberAdd adds two numbers. Computes res = lhs + rhs.
+// Abs is the absolute value operator. Computes n = abs(lhs)
 //
-// Returns res.
-func (res *Number) Add(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberAdd(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
-	return res
+// See also CopyAbs() for a quiet bitwise version of this.
+//
+// This has the same effect as Plus() unless lhs is negative, in which case it has the same
+// effect as Minus().
+//
+// returns n.
+func (n *Number) Abs(lhs *Number, ctx *Context) *Number {
+	C.decNumberAbs(n.DecNumber(), lhs.DecNumber(), ctx.DecContext())
+	return n
 }
 
-// NumberMultiply multiplies one number by another. Computes res = lhs * rhs.
+// Add adds two numbers. Computes n = lhs + rhs.
 //
-// Returns res.
-func (res *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberMultiply(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
-	return res
+// Returns n.
+func (n *Number) Add(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberAdd(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
 }
 
-// NumberDivide divides one number by another. Computes res = lhs / rhs.
+// And is the digitwise AND operator. Computes n = lhs & rhs.
 //
-// Returns res.
-func (res *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberDivide(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
-	return res
+// Logical function restrictions apply; a NaN is returned with InvalidOperation if a restriction is
+// violated.
+//
+// Returns n.
+func (n *Number) And(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberAnd(n.DecNumber(), lhs.DecNumber(), rhs.DecNumber(), ctx.DecContext())
+	return n
 }
 
-// NumberPower raises a number to a power. Computes res = lhs ** rhs (lhs raised to the power of rhs).
+// Multiply multiplies one number by another. Computes n = lhs * rhs.
+//
+// Returns n.
+func (n *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberMultiply(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
+}
+
+// Divide divides one number by another. Computes n = lhs / rhs.
+//
+// Returns n.
+func (n *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberDivide(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
+}
+
+// Power raises a number to a power. Computes n = lhs ** rhs (lhs raised to the power of rhs).
 //
 // Mathematical function restrictions apply; a NaN is returned with Invalidoperation if a
 // restriction is violated.
@@ -184,18 +208,18 @@ func (res *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
 // The final result is rounded according to the context; it will almost always be correctly rounded,
 // but may be up to 1 ulp in error in rare cases.
 //
-// Returns res.
-func (res *Number) Power(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberPower(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
-	return res
+// Returns n.
+func (n *Number) Power(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberPower(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
 }
 
-// NumberRescale forces exponent to a requested value. Computes res = op(lhs,rhs) where op adjusts the
-// coefficient of res (by rounding or shifting) such that the exponent (-scale) of res has the value rhs.
-// The numerical value of res will equal lhs, except for the effects of any rounding that occurred.
+// Rescale forces exponent to a requested value. Computes n = op(lhs,rhs) where op adjusts the
+// coefficient of n (by rounding or shifting) such that the exponent (-scale) of n has the value rhs.
+// The numerical value of n will equal lhs, except for the effects of any rounding that occurred.
 //
-// Returns res.
-func (res *Number) Rescale(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberRescale(res.dn, lhs.dn, rhs.dn, ctx.DecContext())
-	return res
+// Returns n.
+func (n *Number) Rescale(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberRescale(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
 }
