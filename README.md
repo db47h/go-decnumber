@@ -104,9 +104,10 @@ valid value in a given arithmetic operation).
 - Using the same Number as operand and result, like in `n.Multiply(n, n, ctx)`, is legal and will not
   produce unexpected results.
 
-- Active eror handling via traps is not supported in the Go implementation. The os/signal package
-  does not seem to be able to handle signals raised from C code (this always causes a panic), while
-external signals can be handled just fine.
+- A few functions like the context status manipulation functions have been moved to their own type
+(Status). The C call decContextTestStatus(ctx, mask) is therefore replaced by ctx.Status().Set(mask)
+in the Go implementation. The same goes for decNumberClassToString(number) which is repleaced by
+number.Class().String() in go.
 
 In the C implementation, decQuads are defined in a supporting module for the decimal128 format and
 provide a set of functions that work directly in this format. The decimal128 and decQuad structures
@@ -120,6 +121,24 @@ In the Go implementation, and even if we could split the wrapper into sub-packag
 does not make much sense since we want to provide access to everything that decNumber has to offer;
 the linker will take care of including only the used bits and pieces into the final application
 executable. As such, the decimal32/64/128 are merged into Single, Double and Quad.
+
+### Error handling
+
+Active eror handling via traps is not supported in the Go implementation. The os/signal package does
+not seem to be able to handle signals raised from C code (this always causes a panic), while
+external signals can be handled just fine.
+
+Although most arithmetic functions can cause errors, the standard Go error handling is not used in
+its idiomatic form. That is, arithmetic functions do not return errors. Instead, the type of the
+error is ORed into the status flags in the current context (Context type). It is the responsibility
+of the caller to clear the status flags as required. The result of any routine which returns a
+number will always be a valid number (which may be a special value, such as an Infinity or NaN).
+This permits the use of much fewer error checks; a single check for a whole computation is often
+enough.
+
+To check for errors, get the Context's status with the Status() function (see the Status type), or
+use the Context's ErrorStatus() function.
+
 
 ## Free-list of Numbers
 

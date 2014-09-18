@@ -55,6 +55,11 @@ Arithmetic methods always return the receiver in order to allow chain calling:
 Using the same Number as operand and result, like in n.Multiply(n, n, ctx), is legal and will not
 produce unexpected results.
 
+A few functions like the context status manipulation functions have been moved to their own type
+(Status). The C call decContextTestStatus(ctx, mask) is therefore replaced by ctx.Status().Set(mask)
+in the Go implementation. The same goes for decNumberClassToString(number) which is repleaced by
+number.Class().String() in go.
+
 Error handling: although most arithmetic functions can cause errors, the standard Go error handling
 is not used in its idiomatic form. That is, arithmetic functions do not return errors. Instead, the
 type of the error is ORed into the status flags in the current context (Context type). It is the
