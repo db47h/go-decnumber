@@ -30,6 +30,50 @@ const (
 	RoundMax                      // enum must be less than this
 )
 
+// Class represents the classification for decimal numbers, aligned with IEEE 754 (note that
+// 'normal' and 'subnormal' are meaningful only with a Context or a fixed size format).
+type Class uint32
+
+const (
+	ClassSNaN Class = iota
+	ClassQNaN
+	ClassNegInf
+	ClassNegNormal
+	ClassNegSubnormal
+	ClassNegZero
+	ClassPosZero
+	ClassPosSubnormal
+	ClassPosNormal
+	ClassPosInf
+)
+
+func (c Class) String() string {
+	switch c {
+	case ClassPosNormal:
+		return C.DEC_ClassString_PN
+	case ClassNegNormal:
+		return C.DEC_ClassString_NN
+	case ClassPosZero:
+		return C.DEC_ClassString_PZ
+	case ClassNegZero:
+		return C.DEC_ClassString_NZ
+	case ClassPosSubnormal:
+		return C.DEC_ClassString_PS
+	case ClassNegSubnormal:
+		return C.DEC_ClassString_NS
+	case ClassPosInf:
+		return C.DEC_ClassString_PI
+	case ClassNegInf:
+		return C.DEC_ClassString_NI
+	case ClassQNaN:
+		return C.DEC_ClassString_QN
+	case ClassSNaN:
+		return C.DEC_ClassString_SN
+	default:
+		return C.DEC_ClassString_UN
+	}
+}
+
 // ContextKind to use when creating a new Context with NewContext().
 //
 // The settings for a context are as follows, depending on the ContextKind value:

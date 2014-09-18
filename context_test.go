@@ -128,3 +128,10 @@ func TestStatus_FromString(t *testing.T) {
 		t.Fatal("SetFromString should have failed.")
 	}
 }
+
+func TestClass_String(t *testing.T) {
+	v := dec.ClassNegInf
+	if v.String() != "-Infinity" {
+		t.Fatalf("Got: %s", v)
+	}
+}
