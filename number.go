@@ -155,7 +155,7 @@ func (p *NumberPool) Get() *Number {
 //
 // returns n.
 func (n *Number) Abs(lhs *Number, ctx *Context) *Number {
-	C.decNumberAbs(n.DecNumber(), lhs.DecNumber(), ctx.DecContext())
+	C.decNumberAbs(n.dn, lhs.dn, ctx.DecContext())
 	return n
 }
 
@@ -174,8 +174,13 @@ func (n *Number) Add(lhs *Number, rhs *Number, ctx *Context) *Number {
 //
 // Returns n.
 func (n *Number) And(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberAnd(n.DecNumber(), lhs.DecNumber(), rhs.DecNumber(), ctx.DecContext())
+	C.decNumberAnd(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return n
+}
+
+// Class returns the Class ot a Number
+func (n *Number) Class(ctx *Context) Class {
+	return Class(C.decNumberClass(n.dn, ctx.DecContext()))
 }
 
 // Multiply multiplies one number by another. Computes n = lhs * rhs.
@@ -192,6 +197,81 @@ func (n *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
 func (n *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberDivide(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return n
+}
+
+// IsCanonical tests wether the encoding of a Number is canonical.
+//
+// Always returns true for Number's.
+func (n *Number) IsCanonical() bool {
+	return true
+}
+
+// IsFinite tests whether a number is finite.
+//
+// Returns true if the number is finite, or false otherwise (that is, it is an infinity or a NaN).
+// No error is possible.
+func (n *Number) IsFinite() bool {
+	return n.dn.bits&C.DECSPECIAL == 0
+}
+
+// IsInfinite tests whether a number is infinite.
+//
+// Returns true if the number is infinite, or false otherwise (that is, it is a finite number or a
+// NaN). No error is possible.
+func (n *Number) IsInfinite() bool {
+	return n.dn.bits&C.DECINF != 0
+}
+
+// IsNaN tests whether a number is a NaN (quiet or signaling).
+func (n *Number) IsNaN() bool {
+	return n.dn.bits&(C.DECNAN|C.DECSNAN) != 0
+}
+
+// IsNegative tests whether a number is negative (either minus zero, less than zero, or a NaN with a
+// sign of 1).
+//
+// Note that for the Float types, this is called (for example) IsSigned(), and IsNegative() does not
+// include zeros or NaNs.
+func (n *Number) IsNegative() bool {
+	return n.dn.bits&C.DECNEG != 0
+}
+
+// IsNormal tests whether a number is normal (that is, finite, non-zero, and not subnormal).
+func (n *Number) IsNormal(ctx *Context) bool {
+	return C.decNumberIsNormal(n.dn, ctx.DecContext()) != 0
+}
+
+// IsQNaN tests whether a number is a Quiet NaN.
+func (n *Number) IsQNaN() bool {
+	return n.dn.bits&C.DECNAN != 0
+}
+
+// IsSNaN tests whether a number is a Signaling NaN.
+func (n *Number) IsSNaN() bool {
+	return n.dn.bits&C.DECSNAN != 0
+}
+
+// IsSpecial tests whether a number has a special value (Infinity or NaN); it is the inversion of
+// IsFinite()
+func (n *Number) IsSpecial() bool {
+	return n.dn.bits&C.DECSPECIAL != 0
+}
+
+// IsSubnormal tests whether a number is subnormal (that is, finite, non-zero, and magnitude
+// less than 10^emin).
+func (n *Number) IsSubnormal(ctx *Context) bool {
+	return C.decNumberIsSubnormal(n.dn, ctx.DecContext()) != 0
+}
+
+// IsZero tests whether a number is a zero (either positive or negative).
+func (n *Number) IsZero() bool {
+	return n.dn.lsu[0] == 0 && n.dn.digits == 1 && n.dn.bits&C.DECSPECIAL == 0
+}
+
+// Radix returns the radix (number base) used by the dec package. This always returns
+// 10. No error is possible.
+func (n *Number) Radix() int {
+	return 10
 }
 
 // Power raises a number to a power. Computes n = lhs ** rhs (lhs raised to the power of rhs).

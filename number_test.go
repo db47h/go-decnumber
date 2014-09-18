@@ -66,3 +66,72 @@ func TestNumber_And(t *testing.T) {
 		t.Fatalf("Got %s", a)
 	}
 }
+
+func TestNumber_Class(t *testing.T) {
+	ctx := gp.Context
+	a := gp.Get().Zero()
+	if c := a.Class(ctx); c != dec.ClassPosZero {
+		t.Fail()
+	}
+	a.FromString("-INF", ctx)
+	if c := a.Class(ctx); c != dec.ClassNegInf {
+		t.Fail()
+	}
+}
+
+func TestNumber_IsXYZ(t *testing.T) {
+	ctx := gp.Context
+	n := gp.Get()
+	n.FromString("1234", ctx.ZeroStatus())
+	if !n.IsCanonical() {
+		t.Fatal("Not canonical")
+	}
+	if !n.IsFinite() {
+		t.Fatal("Not finite")
+	}
+	if n.IsInfinite() {
+		t.Fatal("Infinite")
+	}
+	if n.IsNaN() || n.IsQNaN() || n.IsSNaN() {
+		t.Fatal("NaN")
+	}
+	if n.IsNegative() {
+		t.Fatal("Negative")
+	}
+	if !n.IsNormal(ctx) {
+		t.Fatal("Not normal")
+	}
+	if n.IsSpecial() {
+		t.Fatal("Special")
+	}
+	if n.IsSubnormal(ctx) {
+		t.Fatal("Subnormal")
+	}
+	if n.IsZero() {
+		t.Fatal("Zero")
+	}
+	n.FromString("0", ctx.ZeroStatus())
+	if !n.IsZero() || n.IsNormal(ctx) {
+		t.Fatal("Zero is not zero or is normal")
+	}
+	n.FromString("jkl", ctx.ZeroStatus())
+	if !n.IsNaN() {
+		t.Fatal("Not NaN")
+	}
+	if !n.IsQNaN() {
+		t.Fatal("Not QNaN")
+	}
+	if n.IsSNaN() {
+		t.Fatal("Is SNaN")
+	}
+	n.FromString("-INF", ctx.ZeroStatus())
+	if !n.IsSpecial() || n.IsFinite() || !n.IsInfinite() {
+		t.Fatal("Finite")
+	}
+	if n.IsNaN() {
+		t.Fatal("NaN")
+	}
+	if !n.IsNegative() {
+		t.Fatal("Positive")
+	}
+}

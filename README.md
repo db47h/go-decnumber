@@ -133,8 +133,21 @@ its idiomatic form. That is, arithmetic functions do not return errors. Instead,
 error is ORed into the status flags in the current context (Context type). It is the responsibility
 of the caller to clear the status flags as required. The result of any routine which returns a
 number will always be a valid number (which may be a special value, such as an Infinity or NaN).
+
 This permits the use of much fewer error checks; a single check for a whole computation is often
-enough.
+enough. For axample:
+
+	ctx.ZeroStatus()                  // Reset the Context's status flags
+	rate.Divide(rate, hundred, ctx)   // rate=rate/100
+	rate.Add(rate, one, ctx)          // rate=rate+1
+	rate.Power(rate, years, ctx)      // rate=rate**years
+	total.Multiply(rate, start, ctx)  // total=rate*start
+	if err := ctx.ErrorStatus(); err != nil {
+		// Something went wrong somewhere
+		if ctx.Status().Test(dec.Overflow) || total.IsInfinite() {
+			fmt.Println("You probably shouldn't borrow that much")
+		}
+	}
 
 To check for errors, get the Context's status with the Status() function (see the Status type), or
 use the Context's ErrorStatus() function.
