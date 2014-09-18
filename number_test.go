@@ -5,14 +5,15 @@
 package dec_test
 
 import (
-	dec "."
+	"."
+	"./util"
 	"testing"
 )
 
 var (
 	numberContext = dec.NewContext(dec.InitQuad, 0)
 	gp            = dec.NumberPool{
-		&dec.Pool{New: func() interface{} { return dec.NewNumber(numberContext.Digits()) }},
+		&util.Pool{New: func() interface{} { return dec.NewNumber(numberContext.Digits()) }},
 		numberContext,
 	}
 )

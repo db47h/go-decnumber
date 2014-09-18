@@ -116,30 +116,30 @@ func (n *Number) FromString(s string, ctx *Context) *Number {
 // Pooling facilities
 //
 
-// A NumberPooler represents an object that can be used as a generic pool. sync.Pool and
-// dec.Pool implement this interface.
-type Pooler interface {
+// A Pool represents an object that can be used as a generic pool. sync.Pool and
+// util.Pool implement this interface.
+type Pool interface {
 	Get() interface{}
 	Put(interface{})
 }
 
-// A NumberPool wraps a Pooler to automatically type cast the result of Get() to a *Number.
+// A NumberPool wraps a Pool to automatically type cast the result of Get() to a *Number.
 // The *Context field is a convenience field to help in keeping track of the pool and associated
 // Context with a single reference.
 type NumberPool struct {
-	Pooler
+	Pool
 	*Context
 }
 
 // Get returns a free *Number from the pool.
 func (p *NumberPool) Get() *Number {
-	return p.Pooler.Get().(*Number)
+	return p.Pool.Get().(*Number)
 }
 
 // Put returns a *Number to the pool
-// Not implemented. Uses promoted Pooler.Put()
+// Not implemented. Uses promoted Pool.Put()
 // func (p *numberPool) Put(n *Number) {
-//	p.Pooler.Put(n)
+//	p.Pool.Put(n)
 // }
 
 //

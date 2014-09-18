@@ -157,8 +157,9 @@ use the Context's ErrorStatus() function.
 
 The package provides facilities for managing free-lists of Numbers in order to relieve pressure on
 the garbage collector in computation intensive applications. NumberPool is in fact a simple wrapper
-around a \*Context and a `sync.Pool`, or the lighter `dec.Pool`, which will automatically cast the
-return value of `Get()` to the desired type.
+around a \*Context and a sync.Pool (or the lighter util.Pool provided in the util subpackage);
+NumberPool will automatically cast the return value of Get() to the desired type.
+
 
 For example:
 
@@ -175,9 +176,6 @@ For example:
 	number.FromString("1243", pool.Context)
 
 Note the use of `pool.Context` on the last statement.
-
-The provided `dec.Pool` implementation is not thread safe and is only provided as a
-lightweight alternative to sync.Pool.
 
 If an application needs to change its arithmetic precision on the fly, any NumberPool built on top
 of the affected Context's will need to be discarded and recreated along with the Context. This will
@@ -274,7 +272,6 @@ when using the syso mechanism.
 
 - Implement basic math functions.
 - Thoroughly test free-list management and proper resource clean-up.
-- merge decimal32/64/128 into Single, Double and Quad.
 
 # Licensing
 

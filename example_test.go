@@ -6,6 +6,7 @@ package dec_test
 
 import (
 	"."
+	"./util"
 	"fmt"
 	"sync"
 )
@@ -72,7 +73,7 @@ func Example_example6() {
 
 	// Create a global NumberPool
 	p := &dec.NumberPool{
-		&dec.Pool{New: func() interface{} { return dec.NewNumber(gCtx.Digits()) }},
+		&util.Pool{New: func() interface{} { return dec.NewNumber(gCtx.Digits()) }},
 		gCtx,
 	}
 	// arguments for CompoundInterest
@@ -271,7 +272,7 @@ func ExampleNumberPool_2() {
 
 	// And a usable pool based on dec.Pool
 	pool := &dec.NumberPool{
-		&dec.Pool{
+		&util.Pool{
 			New: func() interface{} { return dec.NewNumber(ctx.Digits()) },
 		},
 		ctx,

@@ -2,32 +2,33 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package dec
+// Package util provides a set of utility functions and types for the dec package.
+//
+package util
 
 // poolSize is the default maximum size for new pools.
-var poolSize uint = 128
+// Must be a power of two
+var poolSize int = 128
 
 // A Pool is a set of temporary objects that may be individually saved and retrieved.
 //
 // Pool's purpose is to cache allocated but unused items for later reuse, relieving pressure on the
 // garbage collector.
 //
-// This is a naïve implementation based on a fixed capacity Go channel. It is not thread-safe and is
+// This is a naïve implementation based on a fixed capacity slice. It is not thread-safe and is
 // only provided as a lightweight alternative to sync.Pool to manage free-lists of *Number's. See
 // NumberPool().
 type Pool struct {
-	pool    chan interface{}   // use a channel to hold pooled data
-	New     func() interface{} // how to create new items
-	MaxSize uint               // maximum size of the pool
+	pool []interface{}      // use a channel to hold pooled data
+	in   int                // Index of the next Put() value
+	out  int                // Index of the next Get() value
+	len  int                // number of items in the pool
+	New  func() interface{} // how to create new items
 }
 
 // initPool initializes the pool on first use
 func (p *Pool) initPool() {
-	size := p.MaxSize
-	if size == 0 {
-		size = poolSize
-	}
-	p.pool = make(chan interface{}, size)
+	p.pool = make([]interface{}, poolSize)
 }
 
 // Get selects an arbitrary item from the Pool, removes it from the Pool, and returns it to the
@@ -39,10 +40,13 @@ func (p *Pool) Get() interface{} {
 	if p.pool == nil {
 		p.initPool()
 	}
-	select {
-	case item := <-p.pool:
-		return item
-	default:
+	if p.len > 0 {
+		v := p.pool[p.out]
+		p.pool[p.out] = nil // remove reference
+		p.out++
+		p.out &= poolSize - 1 // => same as p.out %= poolSize
+		p.len--
+		return v
 	}
 	if p.New != nil {
 		return p.New()
@@ -52,14 +56,17 @@ func (p *Pool) Get() interface{} {
 
 // Put adds x to the pool. If the pool is full, x will just get discarded silently.
 func (p *Pool) Put(x interface{}) {
-	if x == nil {
-		return
-	}
 	if p.pool == nil {
 		p.initPool()
 	}
-	select {
-	case p.pool <- x:
-	default:
+	if x == nil {
+		return
 	}
+	if p.len == poolSize {
+		return
+	}
+	p.pool[p.in] = x
+	p.in++
+	p.in &= poolSize - 1 // => same as p.in %= poolSize
+	p.len++
 }

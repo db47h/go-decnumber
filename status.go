@@ -50,7 +50,7 @@ var statusString = map[Status]string{
 	Underflow:           "Underflow",
 }
 
-// String returns a human-readable description of a status bit as a string..
+// String returns a human-readable description of a status bit as a string.
 // The bits set in the status field must comprise only bits defined.
 // If no bits are set in the status field, the string “No status” is returned. If more than one
 // bit is set, the string “Multiple status” is returned.

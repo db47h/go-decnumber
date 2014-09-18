@@ -47,6 +47,7 @@ const (
 	ClassPosInf
 )
 
+// String returns a human-readable description of a number Class as a string.
 func (c Class) String() string {
 	switch c {
 	case ClassPosNormal:

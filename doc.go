@@ -73,8 +73,8 @@ type), or use the Context's ErrorStatus() function.
 
 The package provides facilities for managing free-lists of Numbers in order to relieve pressure on
 the garbage collector in computation intensive applications. NumberPool is in fact a simple wrapper
-around a *Context and a sync.Pool, or the lighter dec.Pool, which will automatically cast the return
-value of Get() to the desired type.
+around a *Context and a sync.Pool (or the lighter util.Pool provided in the util subpackage);
+NumberPool will automatically cast the return value of Get() to the desired type.
 
 For example:
 
@@ -96,9 +96,6 @@ If a particular implementation needs always-initialized numbers (like any new Go
 to the 0 value of its type), the pool's New function can be set for example to:
 
 	func() interface{} { return dec.NewNumber(ctx.Digits()).Zero() }
-
-The provided dec.Pool implementation is not thread safe and is only provided as a lightweight
-alternative to sync.Pool.
 
 If an application needs to change its arithmetic precision on the fly, any NumberPool built on top
 of the affected Context's will need to be discarded and recreated along with the Context. This will

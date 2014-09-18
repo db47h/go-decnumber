@@ -17,6 +17,7 @@ import (
 	"unsafe"
 )
 
+// Quad characteristics.
 const (
 	QuadDigits = C.DECQUAD_Pmax
 	QuadBytes  = C.DECQUAD_Bytes
