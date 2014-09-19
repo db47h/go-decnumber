@@ -92,7 +92,7 @@ func TestContext_ErrorStatus(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	ctx.Status().Set(dec.DivisionByZero)
 	err := ctx.ErrorStatus()
-	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
+	if _, ok := err.(*dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
 		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
 	}
 }
@@ -100,7 +100,7 @@ func TestContext_ErrorStatus(t *testing.T) {
 func TestStatus_ToError(t *testing.T) {
 	ctx := dec.NewContext(dec.InitDecimal128, 0)
 	err := ctx.Status().Set(dec.DivisionByZero).ToError()
-	if _, ok := err.(dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
+	if _, ok := err.(*dec.ContextError); !ok || err == nil || err.Error() != "Division by zero" {
 		t.Fatalf("Bad ErrorStatus(). Expected \"Division by zero\", got \"%v\"", err)
 	}
 }

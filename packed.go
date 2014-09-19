@@ -60,11 +60,11 @@ func (p *Packed) ToNumber(num *Number) (*Number, error) {
 		num = NewNumber(sz*2 - 1)
 	}
 	if len(p.Buf) == 0 {
-		return num.Zero(), ContextError(InvalidOperation)
+		return num.Zero(), &ContextError{InvalidOperation}
 	}
 	res := C.decPackedToNumber((*C.uint8_t)(&p.Buf[0]), C.int32_t(len(p.Buf)), (*C.int32_t)(&p.Scale), num.DecNumber())
 	if res == nil {
-		return num, ContextError(InvalidOperation)
+		return num, &ContextError{InvalidOperation}
 	}
 	return num, nil
 }
@@ -87,7 +87,7 @@ func (p *Packed) FromNumber(num *Number) error {
 	res := C.decPackedFromNumber((*C.uint8_t)(&p.Buf[0]), C.int32_t(len(p.Buf)),
 		(*C.int32_t)(&p.Scale), num.DecNumber())
 	if res == nil {
-		return ContextError(InvalidOperation)
+		return &ContextError{InvalidOperation}
 	}
 	return nil
 }

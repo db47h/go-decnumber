@@ -54,11 +54,11 @@ var statusString = map[Status]string{
 // The bits set in the status field must comprise only bits defined.
 // If no bits are set in the status field, the string “No status” is returned. If more than one
 // bit is set, the string “Multiple status” is returned.
-func (s *Status) String() string {
-	if *s == 0 {
+func (s Status) String() string {
+	if s == 0 {
 		return "No status"
 	}
-	if str, ok := statusString[*s]; ok {
+	if str, ok := statusString[s]; ok {
 		return str
 	}
 	return "Multiple status"
@@ -76,7 +76,7 @@ func (s *Status) SetFromString(str string) error {
 			return nil
 		}
 	}
-	return ContextError(ConversionSyntax)
+	return &ContextError{ConversionSyntax}
 }
 
 // Set sets one or more status bits in the status field. Since traps are
@@ -110,17 +110,17 @@ func (s *Status) Zero() *Status {
 }
 
 // Test tests bits in the status and returns true if any of the tested bits are 1.
-func (s *Status) Test(mask Status) bool {
-	return *s&mask != 0
+func (s Status) Test(mask Status) bool {
+	return s&mask != 0
 }
 
 // Save saves bits in current status. mask indicates the bits to be saved (the status bits that
 // correspond to each 1 bit in the mask are saved).
 //
 // Returns a *Status that represents the AND of the mask and the current status.
-func (s *Status) Save(mask Status) *Status {
-	res := *s & mask
-	return &res
+func (s Status) Save(mask Status) Status {
+	res := s & mask
+	return res
 }
 
 // Restore restores bits in the current status.
@@ -137,8 +137,7 @@ func (s *Status) Restore(newStatus Status, mask Status) *Status {
 
 // Func ToError() checks the status for any error condition and returns, as an error,
 // a ContextError if any, nil otherwise.
-// Convert the return value with err.(dec.ContextError) to compare it
-// against any of the Status values.
+// Use err.(*dec.ContextError).Test() to test it against any of the Status values.
 //
 // Status bits considered errors are:
 //
@@ -151,9 +150,9 @@ func (s *Status) Restore(newStatus Status, mask Status) *Status {
 //	InvalidOperation
 //	Overflow
 //	Underflow
-func (s *Status) ToError() error {
-	if e := *s & Errors; e != 0 {
-		return ContextError(e)
+func (s Status) ToError() error {
+	if e := s & Errors; e != 0 {
+		return &ContextError{e}
 	}
 	return nil
 }
@@ -161,9 +160,11 @@ func (s *Status) ToError() error {
 // ContextError represents an error condition for a Context. One can check if the last operation
 // in a Context generated an error either with Context.ErrorStatus() (returns a ContextError cast as
 // an error) or Context.TestStatus(Context.Errors) which returns true if an error occured.
-type ContextError Status
+type ContextError struct {
+	Status
+}
 
 // Error returns a string representation of the error status.
-func (e ContextError) Error() string {
-	return (*Status)(&e).String()
+func (e *ContextError) Error() string {
+	return e.Status.String()
 }

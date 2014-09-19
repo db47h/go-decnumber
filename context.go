@@ -134,6 +134,13 @@ const (
 	MaxMath   = 999999
 )
 
+// A Pool represents an object that can be used as a generic pool. sync.Pool and
+// util.Pool implement this interface.
+type Pool interface {
+	Get() interface{}
+	Put(interface{})
+}
+
 // A Context wraps a decNumber context, the data structure used for providing the context
 // for operations and for managing exceptional conditions.
 //
@@ -287,8 +294,8 @@ func (c *Context) Status() *Status {
 }
 
 // ErrorStatus checks the Context status for any error condition and returns, as an error, a
-// ContextError if any, nil otherwise.  Convert the return value with err.(dec.ContextError) to
-// compare it against any of the Status values. This is a shorthand for Context.Status().ToError()
+// ContextError if any, nil otherwise.  Use err.(*dec.ContextError).Test() to
+// test the result against any of the Status values. This is a shorthand for Context.Status().ToError()
 func (c *Context) ErrorStatus() error {
 	return c.Status().ToError()
 }

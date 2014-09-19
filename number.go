@@ -116,13 +116,6 @@ func (n *Number) FromString(s string, ctx *Context) *Number {
 // Pooling facilities
 //
 
-// A Pool represents an object that can be used as a generic pool. sync.Pool and
-// util.Pool implement this interface.
-type Pool interface {
-	Get() interface{}
-	Put(interface{})
-}
-
 // A NumberPool wraps a Pool to automatically type cast the result of Get() to a *Number.
 // The *Context field is a convenience field to help in keeping track of the pool and associated
 // Context with a single reference.
@@ -136,11 +129,14 @@ func (p *NumberPool) Get() *Number {
 	return p.Pool.Get().(*Number)
 }
 
-// Put returns a *Number to the pool
-// Not implemented. Uses promoted Pool.Put()
-// func (p *numberPool) Put(n *Number) {
-//	p.Pool.Put(n)
-// }
+// Putn returns *Number's to the pool
+//
+// Use the promoted Pool.Put() for single values.
+func (p *NumberPool) Putn(n ...*Number) {
+	for _, x := range n {
+		p.Pool.Put(x)
+	}
+}
 
 //
 // Arithmetic functions
@@ -183,11 +179,46 @@ func (n *Number) Class(ctx *Context) Class {
 	return Class(C.decNumberClass(n.dn, ctx.DecContext()))
 }
 
-// Multiply multiplies one number by another. Computes n = lhs * rhs.
+// Compare compares two numbers numerically. If the lhs is less than the rhs then the number will be
+// set to the value -1 (lhs - rhs < 0). If they are equal, then number is set to 0 (lhs - rhs = 0).
+// If the lhs is greater than the rhs then the number will be set to the value 1 (lhs - rhs > 0). If
+// the operands are not comparable (that is, one or both is a NaN) the result will be NaN.
 //
 // Returns n.
-func (n *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
-	C.decNumberMultiply(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+func (n *Number) Compare(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberCompare(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
+}
+
+// CompareSignal ompares two numbers numerically. It is identical to Compare except that
+// all NaNs (including quiet NaNs) signal.
+//
+// Returns n.
+func (n *Number) CompareSignal(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberCompareSignal(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
+}
+
+// CompareTotal compares two numbers using the IEEE 754 total ordering. If the lhs is less than the rhs in
+// the total order then the number will be set to the value -1. If they are equal, then number is set to 0. If
+// the lhs is greater than the rhs then the number will be set to the value 1.
+// The total order differs from the numerical comparison in that: -NaN < -sNaN < -Infinity < -finites <
+// -0 < +0 < +finites < +Infinity < +sNaN < +NaN. Also, 1.000 < 1.0 (etc.) and NaNs are ordered by
+// payload.
+//
+// Returns n.
+func (n *Number) CompareTotal(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberCompareTotal(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
+}
+
+// CompareTotalMag compares the magnitude of two Number's using the IEEE 754 total ordering. It is
+// identical to decNumberCompareTotal except that the signs of the operands are ignored and taken to be
+// 0 (non-negative).
+//
+// Returns n.
+func (n *Number) CompareTotalMag(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberCompareTotalMag(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return n
 }
 
@@ -196,6 +227,14 @@ func (n *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
 // Returns n.
 func (n *Number) Divide(lhs *Number, rhs *Number, ctx *Context) *Number {
 	C.decNumberDivide(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
+	return n
+}
+
+// Multiply multiplies one number by another. Computes n = lhs * rhs.
+//
+// Returns n.
+func (n *Number) Multiply(lhs *Number, rhs *Number, ctx *Context) *Number {
+	C.decNumberMultiply(n.dn, lhs.dn, rhs.dn, ctx.DecContext())
 	return n
 }
 

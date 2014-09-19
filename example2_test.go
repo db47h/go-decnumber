@@ -45,7 +45,7 @@ func CompoundInterest(p *dec.NumberPool, start *dec.Number, rate *dec.Number, ye
 	// Function epilogue:
 	err := p.ErrorStatus() // check errors
 	// Merge previous status
-	p.Status().Set(*saved)
+	p.Status().Set(saved)
 
 	return total, err
 
