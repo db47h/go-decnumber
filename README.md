@@ -122,7 +122,7 @@ does not make much sense since we want to provide access to everything that decN
 the linker will take care of including only the used bits and pieces into the final application
 executable. As such, the decimal32/64/128 are merged into Single, Double and Quad.
 
-### Error handling
+## Error handling
 
 Active eror handling via traps is not supported in the Go implementation. The os/signal package does
 not seem to be able to handle signals raised from C code (this always causes a panic), while
@@ -152,14 +152,12 @@ enough. For axample:
 To check for errors, get the Context's status with the Status() function (see the Status type), or
 use the Context's ErrorStatus() function.
 
-
 ## Free-list of Numbers
 
 The package provides facilities for managing free-lists of Numbers in order to relieve pressure on
 the garbage collector in computation intensive applications. NumberPool is in fact a simple wrapper
 around a \*Context and a sync.Pool (or the lighter util.Pool provided in the util subpackage);
 NumberPool will automatically cast the return value of Get() to the desired type.
-
 
 For example:
 
@@ -180,31 +178,6 @@ Note the use of `pool.Context` on the last statement.
 If an application needs to change its arithmetic precision on the fly, any NumberPool built on top
 of the affected Context's will need to be discarded and recreated along with the Context. This will
 not affect existing numbers that can still be used as valid operands in arithmetic functions.
-
-## Example scenario
-
-A concrete usage example of the fixed context precision and free-list management could be a
-calculator application where we have:
-
-- a global NumberPool managing a free-list of Number's and only reference to a global pool.
-- a global stack of numbers (implemented as a slice)
-
-For all arithmetic computations, temporary numbers, etc., we use the idiomatic `number := pool.Get()`
-followed by a deferred call to `pool.Put(number)`. To compute the addition of the top two
-numbers on the stack, we do the following:
-
-	X, Y = := globalStack.Pop2()          // pop top 2 numbers off the stack
-	result := globalPool.Get()            // Get a new Number
-	result.Add(X, Y, globalPool.Context)  // and set it to X+Y
-	globalPool.Put(X)                     // Put X and Y back in the pool
-	globalPool.Put(Y)
-	globalStack.Push(result)              // push the result on top of the stack
-
-When the user requests a change in precision, we create a new Context setup for the requested
-precision and replace the global NumberPool with a new one referencing this new Context.  Numbers
-present on the stack are kept as-is since they are still valid Numbers when used as operands in
-arithmetic functions. New operations will be performed using the new Context's precision since we
-make sure that every operation is done with a freshly created Number for its result.
 
 ## Threading, goroutines
 

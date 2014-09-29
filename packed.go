@@ -75,9 +75,9 @@ func (p *Packed) ToNumber(num *Number) (*Number, error) {
 // final 4-bit nibble in the array will be a sign nibble, C (1100) for + and D (1101) for -. Unused
 // bytes and nibbles to the left of the number are set to 0.
 //
-// The PAcked scale is set to the scale of the number (this is the exponent, negated). To force the
-// number to a specified scale, first use the decNumberRescale routine, which will round and change
-// the exponent as necessary (TODO: but the Go implementation may fail to allocate enough space).
+// The Packed scale is set to the scale of the number (this is the exponent, negated). To force the
+// number to a specified scale, first use Rescale, which will round and change
+// the exponent as necessary.
 //
 // If there is an error (that is, the Number has too many digits to fit the byte array, or it is a
 // NaN or Infinity), NULL is returned and the bcd and scale results are unchanged.  Otherwise bcd is
